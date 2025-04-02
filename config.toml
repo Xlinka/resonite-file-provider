@@ -1,0 +1,6 @@
+[Database]
+user = "resonite-inventory"
+password = ""
+host = "localhost"
+port = 3306
+name = "resonite-inventory"
