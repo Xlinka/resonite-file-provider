@@ -14,7 +14,8 @@ type Config struct {
    	     	Name     string
     	}
 }
-func Connect() *sql.DB {
+var Db *sql.DB
+func Connect() {
 	var config Config
 	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
 	    panic(err)
@@ -30,6 +31,6 @@ func Connect() *sql.DB {
 	if err := db.Ping(); err != nil {
 		panic(err)
 	}
+	Db = db
 	println("Connected to db")
-	return db
 }

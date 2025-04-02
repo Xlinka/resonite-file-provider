@@ -1,13 +1,14 @@
 package main
 
 import (
-	"database/sql"
 	"resonite-file-provider/assethost"
 	"resonite-file-provider/database"
+	"resonite-file-provider/authentication"
 )
-var db *sql.DB
 func main() {
-	db = database.Connect()
+	database.Connect()
+	defer database.Db.Close()
+
+	authentication.AddAuthListeners()
 	assethost.StartHost()
-	defer db.Close()
 }
