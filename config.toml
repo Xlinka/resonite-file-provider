@@ -4,3 +4,8 @@ password = ""
 host = "localhost"
 port = 3306
 name = "resonite-inventory"
+[Server]
+host = "localhost"
+port =  5819
+itemsPath = "./items"
+assetsPath = "./assets"
