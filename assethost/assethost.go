@@ -14,6 +14,14 @@ func isOwnedBy(owner string, url string) bool {
 }
 func handleRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/assets/")
+		next.ServeHTTP(w, r)
+		return
+		//TODO
+		if !strings.HasSuffix(r.URL.Path, ".brson") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -34,8 +42,6 @@ func handleRequest(next http.Handler) http.Handler {
 }
 
 func StartHost(){
-	fs := http.FileServer(http.Dir("./items"))
-	http.Handle("/items/", handleRequest(fs))
 	http.Handle("/assets/", handleRequest(http.FileServer(http.Dir("./assets"))))
 	http.ListenAndServe(":8080", nil)
 }
