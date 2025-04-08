@@ -25,18 +25,13 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 	}
 	idsTrack := animxmaker.ListTrack(childFoldersIds, "ids")
 	namesTrack := animxmaker.ListTrack(childFoldersNames, "names")
-	response := animxmaker.Animx{
-		TrackCount: 2,
-		Tracks: []animxmaker.AnimationTrack{
-			idsTrack,
-			namesTrack,
+	response := animxmaker.Animation{
+		Tracks: []animxmaker.AnimationTrackWrapper{
+			animxmaker.AnimationTrackWrapper(&idsTrack),
+			animxmaker.AnimationTrackWrapper(&namesTrack),
 		},
 	}
-	encodedResponse, err := response.EncodeBinary()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	encodedResponse := response.EncodeAnimation("response")
 	w.WriteHeader(http.StatusOK)
 	os.WriteFile("anim.animx", encodedResponse, 0644)
 	w.Write(encodedResponse)
