@@ -1,35 +1,54 @@
 package tests
 
-func TestPasswordHashing(t *testing.T) {
-    password := "mysecurepassword"
-    hash, err := hashPassword(password)
-    if err != nil {
-        t.Fatal("Failed to hash password:", err)
-    }
+import (
+	"os"
+	"resonite-file-provider/animxmaker"
+)
 
-    if !checkPasswordHash(password, hash) {
-        t.Error("Password should match hash but doesn't")
-    }
+func bllrpypackage() []byte {
+	keyframes := []animxmaker.KeyFrame[string]{
+		animxmaker.KeyFrame[string]{
+			Position: 0,
+			Value: "FirstFrame",
+		},
+		animxmaker.KeyFrame[string]{
+			Position: 1,
+			Value: "SecondFrame",
+		},
+	}
 
-    if checkPasswordHash("wrongpassword", hash) {
-        t.Error("Wrong password matched hash!")
-    }
+	track := animxmaker.AnimationTrack[string]{
+		Node: "FirstTrack",
+		Property: "FirstTrackProperty",
+		Keyframes: keyframes,
+	}
+	track2 := animxmaker.AnimationTrack[string]{
+		Node: "SecondTrack",
+		Property: "SecondTrackProperty",
+		Keyframes: keyframes,
+	}
+	animation := animxmaker.Animation{
+		Tracks: []animxmaker.AnimationTrackWrapper{
+			animxmaker.AnimationTrackWrapper(&track),
+			animxmaker.AnimationTrackWrapper(&track2),
+		},
+	}
+	return animation.EncodeAnimation("test")
+	
+
 }
-func TestLoginHandler(t *testing.T) {
-    req := httptest.NewRequest("GET", "/login?username=admin&password=secret", nil)
-    w := httptest.NewRecorder()
-
-    loginHandler(w, req)
-
-    res := w.Result()
-    body, _ := io.ReadAll(res.Body)
-
-    if res.StatusCode != http.StatusOK {
-        t.Fatalf("Expected 200 OK, got %d: %s", res.StatusCode, body)
-    }
-
-    if !strings.Contains(string(body), "Authenticated") {
-        t.Errorf("Unexpected response: %s", body)
-    }
+func helperTest() []byte {
+	listtrack := animxmaker.ListTrack[int]([]int{1,76,2,4,6,1}, "listtrack", "int")
+	stringtrack := animxmaker.ListTrack[string]([]string{"a", "b", "c"}, "listtrack", "string")
+	animation := animxmaker.Animation{
+		Tracks: []animxmaker.AnimationTrackWrapper{
+			animxmaker.AnimationTrackWrapper(&listtrack),
+			animxmaker.AnimationTrackWrapper(&stringtrack),
+		},
+	}
+	return animation.EncodeAnimation("test")
 }
-
+func Main(){
+	animationBytes := helperTest()
+	os.WriteFile("listTrack.animx", animationBytes, 0644)
+}

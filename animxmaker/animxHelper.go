@@ -1,6 +1,6 @@
 package animxmaker
 
-func ListTrack[T any](list []T, trackName string) AnimationTrack[T]{
+func ListTrack[T any](list []T, nodeName string, propertyName string) AnimationTrack[T]{
 	var keyframes []KeyFrame[T]
 	for i, item := range list {
 		keyframe := KeyFrame[T]{
@@ -10,7 +10,8 @@ func ListTrack[T any](list []T, trackName string) AnimationTrack[T]{
 		keyframes = append(keyframes, keyframe)
 	}
 	return AnimationTrack[T]{
-		TrackName: trackName,
 		Keyframes: keyframes,
+		Node: nodeName,
+		Property: propertyName,
 	}
 }
