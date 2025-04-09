@@ -38,8 +38,8 @@ func bllrpypackage() []byte {
 
 }
 func helperTest() []byte {
-	listtrack := animxmaker.ListTrack[int]([]int{1,76,2,4,6,1}, "listtrack", "int")
-	stringtrack := animxmaker.ListTrack[string]([]string{"a", "b", "c"}, "listtrack", "string")
+	listtrack := animxmaker.ListTrack[int32]([]int32{1,76,2,4,6,1}, "listtrack", "int")
+	stringtrack := animxmaker.ListTrack[string]([]string{"first", "second", "third"}, "listtrack", "string")
 	animation := animxmaker.Animation{
 		Tracks: []animxmaker.AnimationTrackWrapper{
 			animxmaker.AnimationTrackWrapper(&listtrack),

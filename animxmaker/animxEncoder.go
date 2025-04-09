@@ -37,6 +37,7 @@ func write7BitEncodedInt(n int) []byte {
 	return result
 }
 
+
 func encodeAnimString(s string, isValue bool) ([]byte) {
 	var buf bytes.Buffer
 	if isValue {
@@ -58,7 +59,7 @@ func (a *KeyFrame[T]) EncodeKeyframe() []byte{
 	switch v := any(a.Value).(type) {
 			case string:
 				buf.Write(encodeAnimString(v, true))
-			case int:
+			case int32:
 				binary.Write(&buf, binary.LittleEndian, v)
 			case float32:
 				binary.Write(&buf, binary.LittleEndian, v)
@@ -91,7 +92,7 @@ func (a *AnimationTrack[T]) EncodeTrack() []byte {
 	switch any(a.Keyframes[0].Value).(type) {
 		case string:
 			buf.WriteByte(39) // 39 = String
-		case int:
+		case int32:
 			buf.WriteByte(10) // 10 = Int
 		case float32:
 			buf.WriteByte(21) // 21 = Float
@@ -99,7 +100,7 @@ func (a *AnimationTrack[T]) EncodeTrack() []byte {
 	}
 	buf.Write(encodeAnimString(a.Node, false))
 	buf.Write(encodeAnimString(a.Property, false))
-	binary.Write(&buf, binary.LittleEndian, make([]byte, 0, len(a.Keyframes)))
+	binary.Write(&buf, binary.LittleEndian, write7BitEncodedInt(len(a.Keyframes))) // keyframe count
 	for _, keyframe := range a.Keyframes{
 		buf.Write(keyframe.EncodeKeyframe())
 	}
