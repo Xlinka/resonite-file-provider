@@ -63,7 +63,11 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 			animxmaker.AnimationTrackWrapper(&namesTrack),
 		},
 	}
-	encodedResponse := response.EncodeAnimation("response")
+	encodedResponse, err := response.EncodeAnimation("response")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(encodedResponse)
 }
@@ -105,7 +109,11 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 			animxmaker.AnimationTrackWrapper(&urlsTrack),
 		},
 	}
-	encodedResponse := response.EncodeAnimation("response")
+	encodedResponse, err := response.EncodeAnimation("response")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(encodedResponse)
 }

@@ -7,5 +7,4 @@ name = "resonite-inventory"
 [Server]
 host = "localhost"
 port =  5819
-itemsPath = "./items"
 assetsPath = "./assets"

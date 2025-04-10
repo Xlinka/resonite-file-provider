@@ -1,6 +1,7 @@
 package assethost
 
 import (
+	"fmt"
 	"net/http"
 	"resonite-file-provider/authentication"
 	"resonite-file-provider/database"
@@ -33,7 +34,6 @@ func handleRequest(next http.Handler) http.Handler {
 	})
 }
 
-func StartHost(){
-	http.Handle("/assets/", handleRequest(http.FileServer(http.Dir("./assets"))))
-	http.ListenAndServe(":8080", nil)
+func AddAssetListeners(assetPath string){
+	http.Handle(fmt.Sprintf("/%s/", assetPath), handleRequest(http.FileServer(http.Dir(fmt.Sprintf("./%s", assetPath)))))
 }

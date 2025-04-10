@@ -3,6 +3,7 @@ package animxmaker
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 )
 
 func write7BitEncodedInt(n int) []byte {
@@ -43,7 +44,7 @@ type KeyFrame[T any] struct {
 	Value T 
 }
 
-func (a *KeyFrame[T]) EncodeKeyframe() []byte{
+func (a *KeyFrame[T]) EncodeKeyframe() ([]byte, error){
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.LittleEndian, a.Position)
 	switch v := any(a.Value).(type) {
@@ -53,13 +54,15 @@ func (a *KeyFrame[T]) EncodeKeyframe() []byte{
 				binary.Write(&buf, binary.LittleEndian, v)
 			case float32:
 				binary.Write(&buf, binary.LittleEndian, v)
+			default:
+				return nil, errors.New("Unsupported type")
 			// pain
 		}		
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 type AnimationTrackWrapper interface {
-	EncodeTrack() []byte
+	EncodeTrack() ([]byte, error)
 	GetTrackDuration() float32
 }
 
@@ -76,9 +79,9 @@ func (a *AnimationTrack[T]) GetTrackDuration() float32 {
 	return a.Keyframes[len(a.Keyframes)-1].Position
 }
 
-func (a *AnimationTrack[T]) EncodeTrack() []byte {
+func (a *AnimationTrack[T]) EncodeTrack() ([]byte, error){
 	if len(a.Keyframes) == 0 {
-		return nil
+		return nil, errors.New("No keyframes to encode")
 	}
 	var buf bytes.Buffer
 	buf.WriteByte(1) // track type
@@ -89,22 +92,30 @@ func (a *AnimationTrack[T]) EncodeTrack() []byte {
 			buf.WriteByte(10) // 10 = Int
 		case float32:
 			buf.WriteByte(21) // 21 = Float
+		default:
+			return nil, errors.New("Unsupported type")
+
 		// pain again
 	}
 	buf.Write(encodeAnimString(a.Node, false))
 	buf.Write(encodeAnimString(a.Property, false))
 	binary.Write(&buf, binary.LittleEndian, write7BitEncodedInt(len(a.Keyframes))) // keyframe count
 	for _, keyframe := range a.Keyframes{
-		buf.Write(keyframe.EncodeKeyframe())
+		var keyframeBytes []byte
+		keyframeBytes, err := keyframe.EncodeKeyframe()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(keyframeBytes)
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 type Animation struct {
 	Tracks []AnimationTrackWrapper
 }
 
-func (a *Animation) EncodeAnimation(animationName string) []byte {
+func (a *Animation) EncodeAnimation(animationName string) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.Write(encodeAnimString("AnimX", false))             // "Magic Word"
@@ -121,8 +132,12 @@ func (a *Animation) EncodeAnimation(animationName string) []byte {
 	buf.Write(encodeAnimString(animationName, false))     	// Animation name
 	buf.WriteByte(0)                     			// Encoding type (0 is default binary reader)
 	for _, track := range a.Tracks {
-		buf.Write(track.EncodeTrack())
+		trackBytes, err := track.EncodeTrack()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(trackBytes)
 	}
 	
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
