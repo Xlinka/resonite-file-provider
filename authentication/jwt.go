@@ -9,13 +9,15 @@ var jwtKey = []byte("tempkey")
 
 type Claims struct {
     Username string `json:"username"`
+    UID int `json:"uid"`
     jwt.RegisteredClaims
 }
 
 // GenerateToken creates a signed JWT for a username
-func GenerateToken(username string) (string, error) {
+func GenerateToken(username string, uId int) (string, error) {
     claims := &Claims{
         Username: username,
+	UID: uId,
         RegisteredClaims: jwt.RegisteredClaims{
             ExpiresAt: jwt.NewNumericDate(time.Now().Add(730 * time.Hour)),
         },

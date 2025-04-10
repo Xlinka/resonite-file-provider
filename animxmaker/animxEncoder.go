@@ -5,16 +5,6 @@ import (
 	"encoding/binary"
 )
 
-//const (
-//	typeIds = {
-//		int: 10,
-//		float32: 21,
-//		string: 27,
-//	}
-//)
-//// 7-bit encoded length prefix
-
-
 func write7BitEncodedInt(n int) []byte {
 	var result []byte
 	for {
@@ -37,7 +27,6 @@ func write7BitEncodedInt(n int) []byte {
 	return result
 }
 
-
 func encodeAnimString(s string, isValue bool) ([]byte) {
 	var buf bytes.Buffer
 	if isValue {
@@ -48,6 +37,7 @@ func encodeAnimString(s string, isValue bool) ([]byte) {
 	buf.Write([]byte(s))
 	return buf.Bytes()
 }
+
 type KeyFrame[T any] struct {
 	Position float32
 	Value T 
@@ -80,6 +70,9 @@ type AnimationTrack[T any] struct {
 }
 
 func (a *AnimationTrack[T]) GetTrackDuration() float32 {
+	if len(a.Keyframes) == 0 {
+		return 0
+	}
 	return a.Keyframes[len(a.Keyframes)-1].Position
 }
 
@@ -116,7 +109,6 @@ func (a *Animation) EncodeAnimation(animationName string) []byte {
 
 	buf.Write(encodeAnimString("AnimX", false))             // "Magic Word"
 	binary.Write(&buf, binary.LittleEndian, int32(1))	// Version
-	//buf.WriteByte(1)                     			// Version
 	buf.Write(write7BitEncodedInt(len(a.Tracks)))           // Track count
 	
 	var maxDuration float32 = 0
@@ -125,7 +117,6 @@ func (a *Animation) EncodeAnimation(animationName string) []byte {
 			maxDuration = track.GetTrackDuration()
 		}
 	}
-	println(maxDuration)
 	binary.Write(&buf, binary.LittleEndian, maxDuration) 	// Max duration
 	buf.Write(encodeAnimString(animationName, false))     	// Animation name
 	buf.WriteByte(0)                     			// Encoding type (0 is default binary reader)

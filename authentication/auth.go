@@ -69,7 +69,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var storedHash string
-	err = database.Db.QueryRow("SELECT auth FROM Users WHERE username = ?", username).Scan(&storedHash)
+	var uId int
+	err = database.Db.QueryRow("SELECT auth, id FROM Users WHERE username = ?", username).Scan(&storedHash, &uId)
     	if err == sql.ErrNoRows {
     	    http.Error(w, "Invalid credentials", http.StatusUnauthorized)
     	    return
@@ -82,7 +83,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
         	http.Error(w, "Invalid credentials", http.StatusUnauthorized)
         	return
     	}
-	token, err := GenerateToken(username);
+	token, err := GenerateToken(username, uId);
 	if err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 	}
