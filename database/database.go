@@ -3,19 +3,14 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"resonite-file-provider/config"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type Config struct {
-	User     string
-	Password string
-	Host     string
-	Port     int
-     	Name     string
-}
-
 var Db *sql.DB
-func Connect(cfg Config) {
+func Connect() {
+	cfg := config.GetConfig().Database
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
 	    cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name,
 	)

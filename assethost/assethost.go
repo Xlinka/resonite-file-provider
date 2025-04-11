@@ -7,6 +7,7 @@ import (
 	"resonite-file-provider/database"
 	"strings"
 )
+var assetPathConfig string
 func isOwnedBy(owner int, url string) bool {
 	var exists bool
 	database.Db.QueryRow("SELECT EXISTS (SELECT 1 from Users where id = ? AND id = (SELECT user_id FROM users_inventories WHERE inventory_id = (SELECT inventory_id FROM Folders WHERE id = (SELECT folder_id FROM `Items` WHERE url = ?))))", owner, url).Scan(&exists)
@@ -14,7 +15,7 @@ func isOwnedBy(owner int, url string) bool {
 }
 func handleRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/assets/")
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, assetPathConfig)
 		if !strings.HasSuffix(r.URL.Path, ".brson") {
 			next.ServeHTTP(w, r)
 			return
@@ -35,5 +36,6 @@ func handleRequest(next http.Handler) http.Handler {
 }
 
 func AddAssetListeners(assetPath string){
+	assetPathConfig = assetPath
 	http.Handle(fmt.Sprintf("/%s/", assetPath), handleRequest(http.FileServer(http.Dir(fmt.Sprintf("./%s", assetPath)))))
 }

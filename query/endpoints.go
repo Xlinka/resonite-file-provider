@@ -1,14 +1,16 @@
 package query
 
 import (
+	"fmt"
 	"net/http"
 	"resonite-file-provider/animxmaker"
 	"resonite-file-provider/authentication"
+	"resonite-file-provider/config"
 	"resonite-file-provider/database"
 	"strconv"
 )
 func isFolderOwner(folderId int, userId int) (bool, error) {
-	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = ?", folderId)
+	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = ?)", folderId)
 	if err != nil {
 		return false, err
 	}
@@ -114,7 +116,7 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 		}
 		itemsIds = append(itemsIds, id)
 		itemsNames = append(itemsNames, name)
-		itemsUrls = append(itemsUrls, url)
+		itemsUrls = append(itemsUrls, fmt.Sprintf("%s/%s", config.GetConfig().Server.AssetsPath, url))
 	}
 	idsTrack := animxmaker.ListTrack(itemsIds, "results", "id")
 	namesTrack := animxmaker.ListTrack(itemsNames, "results", "name")
