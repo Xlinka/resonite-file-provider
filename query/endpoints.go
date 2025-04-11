@@ -3,6 +3,7 @@ package query
 import (
 	"net/http"
 	"resonite-file-provider/animxmaker"
+	"resonite-file-provider/authentication"
 	"resonite-file-provider/database"
 	"strconv"
 )
@@ -29,7 +30,13 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "folderId is either not specified or is invalid", http.StatusBadRequest)
 		return
 	}
-	if allowed, err := isFolderOwner(folderId, 1); allowed && err != nil {
+	authKey := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(authKey)
+	if err != nil {
+		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		return
+	}
+	if allowed, err := isFolderOwner(folderId, claims.UID); !allowed || err != nil {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
@@ -73,9 +80,19 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 }
 
 func listItems(w http.ResponseWriter, r *http.Request) {
-	folderId := r.URL.Query().Get("folderId")
-	if folderId == "" {
-		http.Error(w, "folderId is required", http.StatusBadRequest)
+	folderId, err := strconv.Atoi(r.URL.Query().Get("folderId"))
+	if err != nil {
+		http.Error(w, "folderId is either not specified or is invalid", http.StatusBadRequest)
+	}
+	authKey := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(authKey)
+	if err != nil {
+		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		return
+	}
+	if allowed, err := isFolderOwner(folderId, claims.UID); !allowed || err != nil {
+		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
+		return
 	}
 	items, err := database.Db.Query("SELECT id, name, url FROM Items where folder_id = ?", folderId);
 	if err != nil {
@@ -119,6 +136,6 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddSearchListeners() {
-	http.HandleFunc("/query/childFolders/", listFolders)
-	http.HandleFunc("/query/childItems/", listItems)
+	http.HandleFunc("/query/childFolders", listFolders)
+	http.HandleFunc("/query/childItems", listItems)
 }
