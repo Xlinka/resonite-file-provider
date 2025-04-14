@@ -1,11 +1,10 @@
 package query
 
 import (
-	"fmt"
 	"net/http"
+	"path/filepath"
 	"resonite-file-provider/animxmaker"
 	"resonite-file-provider/authentication"
-	"resonite-file-provider/config"
 	"resonite-file-provider/database"
 	"strconv"
 )
@@ -116,7 +115,7 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 		}
 		itemsIds = append(itemsIds, id)
 		itemsNames = append(itemsNames, name)
-		itemsUrls = append(itemsUrls, fmt.Sprintf("%s/%s", config.GetConfig().Server.AssetsPath, url))
+		itemsUrls = append(itemsUrls, filepath.Join("assets", url))
 	}
 	idsTrack := animxmaker.ListTrack(itemsIds, "results", "id")
 	namesTrack := animxmaker.ListTrack(itemsNames, "results", "name")

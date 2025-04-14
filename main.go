@@ -8,6 +8,7 @@ import (
 	"resonite-file-provider/config"
 	"resonite-file-provider/database"
 	"resonite-file-provider/query"
+	"resonite-file-provider/upload"
 )
 
 
@@ -17,7 +18,9 @@ func main() {
 
 	query.AddSearchListeners()
 	authentication.AddAuthListeners()
-	assethost.AddAssetListeners(config.GetConfig().Server.AssetsPath)
+	assethost.AddAssetListeners()
+	upload.AddListeners()
 	addr := fmt.Sprintf("%s:%d", config.GetConfig().Server.Host, config.GetConfig().Server.Port)
-	http.ListenAndServe(addr, nil)
+	go http.ListenAndServe(addr, nil)
+	upload.StartWebServer()
 }
