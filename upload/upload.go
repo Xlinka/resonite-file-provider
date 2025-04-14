@@ -49,4 +49,5 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 
 func AddListeners() {
 	http.HandleFunc("/upload", HandleUpload)
+	http.HandleFunc("/addFolder", HandleAddFolder)
 }
