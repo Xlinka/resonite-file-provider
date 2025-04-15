@@ -129,14 +129,50 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 	}
 	encodedResponse, err := response.EncodeAnimation("response")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error while encoding animx", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(encodedResponse)
 }
 
+func listInventories(w http.ResponseWriter, r *http.Request){
+	auth := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(auth)
+	if err != nil {
+		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+	}
+	result, err := database.Db.Query("SELECT name, id FROM `Inventories` WHERE id in (SELECT id FROM users_inventories WHERE user_id = ?)", claims.UID)
+	if err != nil {
+		http.Error(w, "Failed to query the database", http.StatusInternalServerError)
+	}
+	var inventoryIds []int
+	var inventoryNames []string
+	for result.Next() {
+		var name string
+		var id int
+		result.Scan(&name, &id)
+		inventoryIds = append(inventoryIds, id)
+		inventoryNames = append(inventoryNames, name)
+	}
+	idsTrack := animxmaker.ListTrack(inventoryIds, "results", "id")
+	namesTrack := animxmaker.ListTrack(inventoryNames, "results", "name")
+	response := animxmaker.Animation{
+		Tracks: []animxmaker.AnimationTrackWrapper{
+			animxmaker.AnimationTrackWrapper(&idsTrack),
+			animxmaker.AnimationTrackWrapper(&namesTrack),
+		},
+	}
+	encodedResponse, err := response.EncodeAnimation("response")
+	if err != nil {
+		http.Error(w, "Error while encoding animx", http.StatusInternalServerError)
+	}
+	w.Write(encodedResponse)
+	w.WriteHeader(http.StatusOK)
+}
+
 func AddSearchListeners() {
 	http.HandleFunc("/query/childFolders", listFolders)
 	http.HandleFunc("/query/childItems", listItems)
+	http.HandleFunc("/query/inventories", listInventories)
 }

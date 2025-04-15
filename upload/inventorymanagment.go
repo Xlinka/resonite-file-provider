@@ -49,3 +49,44 @@ func HandleAddFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write([]byte(strconv.FormatInt(newFolderId, 10)))
 }
+
+func HandleAddInventory(w http.ResponseWriter, r* http.Request){
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+	auth := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(auth)
+	if err != nil {
+		http.Error(w, "Auth token missing or invalid", http.StatusUnauthorized)
+	}
+	inventoryName := r.URL.Query().Get("inventoryName")
+	if inventoryName == "" {
+		http.Error(w, "inventoryName missing", http.StatusBadRequest)
+		return
+	}
+	res, err := database.Db.Exec(`INSERT INTO Inventories (name) VALUES (?)`, inventoryName)
+	if err != nil {
+		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+	}
+	invID, err := res.LastInsertId()
+	if err != nil {
+		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+	}
+	_, err = database.Db.Exec(`INSERT INTO users_inventories (user_id, inventory_id) VALUES (?, ?)`, claims.UID, invID)
+	if err != nil {
+		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+	}
+	res, err = database.Db.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, ?, ?)`, "root", -1, invID)
+	if err != nil {
+		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+	}
+	folderID, err := res.LastInsertId()
+	if err != nil {
+		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+	}
+	w.Write(
+		[]byte(
+			strconv.FormatInt(invID, 10) + "\n" + strconv.FormatInt(folderID, 10),
+		),
+	)
+}
