@@ -7,10 +7,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"resonite-file-provider/config"
+	"strconv"
 	"strings"
 )
 
 func HandleUpload(w http.ResponseWriter, r *http.Request) {
+	folderId, err := strconv.Atoi(r.URL.Query().Get("folderId"))
+	if err != nil {
+		http.Error(w, "folderId missing or invalid", http.StatusBadRequest)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -36,7 +42,7 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	err = exec.Command("./ResoniteFilehost", "2", dst.Name()).Run()
+	err = exec.Command("./ResoniteFilehost", strconv.Itoa(folderId), dst.Name()).Run()
 	if err != nil {
 		http.Error(w, "Failed to execute ResoniteFileHost: ", http.StatusInternalServerError)
 		println(err.Error())
