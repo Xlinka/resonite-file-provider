@@ -1,6 +1,7 @@
 assets/*
 items/*
 tests
+certs
 *.animx
 ResoniteFilehost
 server

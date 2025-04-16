@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net/http"
 	"resonite-file-provider/assethost"
 	"resonite-file-provider/authentication"
@@ -20,7 +22,16 @@ func main() {
 	authentication.AddAuthListeners()
 	assethost.AddAssetListeners()
 	upload.AddListeners()
-	addr := fmt.Sprintf("%s:%d", config.GetConfig().Server.Host, config.GetConfig().Server.Port)
-	go http.ListenAndServe(addr, nil)
-	upload.StartWebServer()
+
+	addr := fmt.Sprintf(":%d", config.GetConfig().Server.Port)
+
+	server := &http.Server{
+		Addr: addr,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
+	go upload.StartWebServer()
+	log.Fatal(server.ListenAndServeTLS("certs/fullchain.pem", "certs/privkey.pem"))
 }
