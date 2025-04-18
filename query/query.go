@@ -8,6 +8,62 @@ import (
 	"resonite-file-provider/database"
 	"strconv"
 )
+
+func getChildFoldersTracks(folderId int, nodeName string) (animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, error) {
+	childFolders, err := database.Db.Query("SELECT id, name FROM Folders where parent_folder_id = ?", folderId);
+	if err != nil {
+		return nil, nil, err
+	}
+	var childFoldersIds []int32
+	var childFoldersNames []string
+	defer childFolders.Close()
+	
+	for childFolders.Next() {
+		var id int32
+		var name string
+		if err := childFolders.Scan(&id, &name); err != nil {
+			return nil, nil, err
+		}
+		childFoldersIds = append(childFoldersIds, id)
+		childFoldersNames = append(childFoldersNames, name)
+	}
+
+	
+	
+
+	idsTrack := animxmaker.ListTrack(childFoldersIds, nodeName, "id")
+	namesTrack := animxmaker.ListTrack(childFoldersNames, nodeName, "name")
+	return animxmaker.AnimationTrackWrapper(&idsTrack), animxmaker.AnimationTrackWrapper(&namesTrack), nil
+}
+
+func getChildItemsTracks(folderId int, nodeName string) (animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, error) {
+	items, err := database.Db.Query("SELECT id, name, url FROM Items where folder_id = ?", folderId);
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var itemsIds []int32
+	var itemsNames []string
+	var itemsUrls []string
+	defer items.Close()
+
+	for items.Next() {
+		var id int32
+		var name string
+		var url string
+		if err := items.Scan(&id, &name, &url); err != nil {
+			return nil, nil, nil, err
+		}
+		itemsIds = append(itemsIds, id)
+		itemsNames = append(itemsNames, name)
+		itemsUrls = append(itemsUrls, filepath.Join("assets", url))
+	}
+	idsTrack := animxmaker.ListTrack(itemsIds, nodeName, "id")
+	namesTrack := animxmaker.ListTrack(itemsNames, nodeName, "name")
+	urlsTrack := animxmaker.ListTrack(itemsUrls, nodeName, "url")
+	return &idsTrack, &namesTrack, &urlsTrack, nil
+}
+
 func IsFolderOwner(folderId int, userId int) (bool, error) {
 	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = ?)", folderId)
 	if err != nil {
@@ -41,34 +97,11 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
-	childFolders, err := database.Db.Query("SELECT id, name FROM Folders where parent_folder_id = ?", folderId);
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	var childFoldersIds []int32
-	var childFoldersNames []string
-	defer childFolders.Close()
-	
-	for childFolders.Next() {
-		var id int32
-		var name string
-		if err := childFolders.Scan(&id, &name); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		childFoldersIds = append(childFoldersIds, id)
-		childFoldersNames = append(childFoldersNames, name)
-	}
-
-	
-	
-
-	idsTrack := animxmaker.ListTrack(childFoldersIds, "results", "id")
-	namesTrack := animxmaker.ListTrack(childFoldersNames, "results", "name")
+	idsTrack, namesTrack, err := getChildFoldersTracks(folderId, "results")
 	response := animxmaker.Animation{
 		Tracks: []animxmaker.AnimationTrackWrapper{
-			animxmaker.AnimationTrackWrapper(&idsTrack),
-			animxmaker.AnimationTrackWrapper(&namesTrack),
+			idsTrack,
+			namesTrack,
 		},
 	}
 	encodedResponse, err := response.EncodeAnimation("response")
@@ -95,36 +128,12 @@ func listItems(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
-	items, err := database.Db.Query("SELECT id, name, url FROM Items where folder_id = ?", folderId);
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var itemsIds []int32
-	var itemsNames []string
-	var itemsUrls []string
-	defer items.Close()
-
-	for items.Next() {
-		var id int32
-		var name string
-		var url string
-		if err := items.Scan(&id, &name, &url); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		itemsIds = append(itemsIds, id)
-		itemsNames = append(itemsNames, name)
-		itemsUrls = append(itemsUrls, filepath.Join("assets", url))
-	}
-	idsTrack := animxmaker.ListTrack(itemsIds, "results", "id")
-	namesTrack := animxmaker.ListTrack(itemsNames, "results", "name")
-	urlsTrack := animxmaker.ListTrack(itemsUrls, "results", "url")
-	response := animxmaker.Animation{
+	idsTrack, namesTrack, urlsTrack, err := getChildItemsTracks(folderId, "results")
+		response := animxmaker.Animation{
 		Tracks: []animxmaker.AnimationTrackWrapper{
-			animxmaker.AnimationTrackWrapper(&idsTrack),
-			animxmaker.AnimationTrackWrapper(&namesTrack),
-			animxmaker.AnimationTrackWrapper(&urlsTrack),
+			idsTrack,
+			namesTrack,
+			urlsTrack,
 		},
 	}
 	encodedResponse, err := response.EncodeAnimation("response")
@@ -171,8 +180,50 @@ func listInventories(w http.ResponseWriter, r *http.Request){
 	w.WriteHeader(http.StatusOK)
 }
 
+func listFolderContents(w http.ResponseWriter, r *http.Request) {
+	folderId, err := strconv.Atoi(r.URL.Query().Get("folderId"))
+	if err != nil {
+		http.Error(w, "folderId is either not specified or is invalid", http.StatusBadRequest)
+	}
+	authKey := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(authKey)
+	if err != nil {
+		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		return
+	}
+	if allowed, err := IsFolderOwner(folderId, claims.UID); !allowed || err != nil {
+		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
+		return
+	}
+	itemIdsTrack, itemNamesTrack, itemUrlsTrack, err := getChildItemsTracks(folderId, "items")
+	if err != nil {
+		http.Error(w, "Error while getting items", http.StatusInternalServerError)
+		return
+	}
+	folderIdsTrack, folderNamesTrack, err := getChildFoldersTracks(folderId, "folders")
+	if err != nil {
+		http.Error(w, "Error while getting folders", http.StatusInternalServerError)
+		return
+	}
+	response := animxmaker.Animation{
+		Tracks: []animxmaker.AnimationTrackWrapper{
+			itemIdsTrack,
+			itemNamesTrack,
+			itemUrlsTrack,
+			folderIdsTrack,
+			folderNamesTrack,
+		},
+	}
+	encodedResponse, err := response.EncodeAnimation("response")
+	if err != nil {
+		http.Error(w, "Error while encoding animx", http.StatusInternalServerError)
+	}
+	w.Write(encodedResponse)
+}
+
 func AddSearchListeners() {
 	http.HandleFunc("/query/childFolders", listFolders)
 	http.HandleFunc("/query/childItems", listItems)
+	http.HandleFunc("/query/folderContent", listFolderContents)
 	http.HandleFunc("/query/inventories", listInventories)
 }
