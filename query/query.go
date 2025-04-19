@@ -9,10 +9,14 @@ import (
 	"strconv"
 )
 
-func getChildFoldersTracks(folderId int, nodeName string) (animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, error) {
+func getChildFoldersTracks(folderId int, nodeName string) (animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, error) {
 	childFolders, err := database.Db.Query("SELECT id, name FROM Folders where parent_folder_id = ?", folderId);
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	var parentFolderId int
+	if err := database.Db.QueryRow("SELECT parent_folder_id FROM Folders WHERE id = ?", folderId).Scan(&parentFolderId); err != nil {
+		return nil, nil, nil, err
 	}
 	var childFoldersIds []int32
 	var childFoldersNames []string
@@ -22,7 +26,7 @@ func getChildFoldersTracks(folderId int, nodeName string) (animxmaker.AnimationT
 		var id int32
 		var name string
 		if err := childFolders.Scan(&id, &name); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		childFoldersIds = append(childFoldersIds, id)
 		childFoldersNames = append(childFoldersNames, name)
@@ -30,10 +34,10 @@ func getChildFoldersTracks(folderId int, nodeName string) (animxmaker.AnimationT
 
 	
 	
-
 	idsTrack := animxmaker.ListTrack(childFoldersIds, nodeName, "id")
 	namesTrack := animxmaker.ListTrack(childFoldersNames, nodeName, "name")
-	return animxmaker.AnimationTrackWrapper(&idsTrack), animxmaker.AnimationTrackWrapper(&namesTrack), nil
+	parentFolderTrack := animxmaker.ListTrack([]int32{int32(parentFolderId)}, nodeName, "parentFolder")
+	return &idsTrack, &namesTrack, &parentFolderTrack, nil
 }
 
 func getChildItemsTracks(folderId int, nodeName string) (animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, animxmaker.AnimationTrackWrapper, error) {
@@ -65,7 +69,7 @@ func getChildItemsTracks(folderId int, nodeName string) (animxmaker.AnimationTra
 }
 
 func IsFolderOwner(folderId int, userId int) (bool, error) {
-	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = ?)", folderId)
+	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = (SELECT inventory_id FROM Folders WHERE id = ?))", folderId)
 	if err != nil {
 		return false, err
 	}
@@ -97,11 +101,12 @@ func listFolders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
-	idsTrack, namesTrack, err := getChildFoldersTracks(folderId, "results")
+	idsTrack, namesTrack, parentFoldertrack, err := getChildFoldersTracks(folderId, "results")
 	response := animxmaker.Animation{
 		Tracks: []animxmaker.AnimationTrackWrapper{
 			idsTrack,
 			namesTrack,
+			parentFoldertrack,
 		},
 	}
 	encodedResponse, err := response.EncodeAnimation("response")
@@ -200,7 +205,7 @@ func listFolderContents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error while getting items", http.StatusInternalServerError)
 		return
 	}
-	folderIdsTrack, folderNamesTrack, err := getChildFoldersTracks(folderId, "folders")
+	folderIdsTrack, folderNamesTrack, parentFolderTrack, err := getChildFoldersTracks(folderId, "folders")
 	if err != nil {
 		http.Error(w, "Error while getting folders", http.StatusInternalServerError)
 		return
@@ -212,6 +217,7 @@ func listFolderContents(w http.ResponseWriter, r *http.Request) {
 			itemUrlsTrack,
 			folderIdsTrack,
 			folderNamesTrack,
+			parentFolderTrack,
 		},
 	}
 	encodedResponse, err := response.EncodeAnimation("response")

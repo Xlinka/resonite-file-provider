@@ -80,11 +80,26 @@ func (a *AnimationTrack[T]) GetTrackDuration() float32 {
 }
 
 func (a *AnimationTrack[T]) EncodeTrack() ([]byte, error){
-	if len(a.Keyframes) == 0 {
-		return nil, errors.New("No keyframes to encode")
-	}
+
 	var buf bytes.Buffer
 	buf.WriteByte(1) // track type
+	if len(a.Keyframes) == 0 {
+		// If there's no keyframes we need to write a dummy keyframe in order to prevent resontie from crashing
+		buf.WriteByte(39) // 39 = String
+		buf.Write(encodeAnimString(a.Node, false))
+		buf.Write(encodeAnimString(a.Property, false))
+		binary.Write(&buf, binary.LittleEndian, write7BitEncodedInt(1)) // keyframe count
+		keyframe := KeyFrame[string]{
+			Position: 0,
+			Value: "No results",
+		}
+		keyframeBytes, err := keyframe.EncodeKeyframe()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(keyframeBytes)
+		return buf.Bytes(), nil
+	}
 	switch any(a.Keyframes[0].Value).(type) {
 		case string:
 			buf.WriteByte(39) // 39 = String
