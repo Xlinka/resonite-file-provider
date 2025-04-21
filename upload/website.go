@@ -1,13 +1,11 @@
 package upload
 
 import (
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
-	"resonite-file-provider/animxmaker"
 	"resonite-file-provider/authentication"
 	"resonite-file-provider/database"
 	"resonite-file-provider/query"
