@@ -104,7 +104,7 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid file type", http.StatusBadRequest)
 		return
 	}
-<<<<<<< Updated upstream
+	
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, file)
 	if err != nil {
@@ -208,43 +208,11 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 	newBrsonData := mapRecursiveReplace(brsonData, "packdb://", assetUrl)
 	newBrson, err := writeBrson(newBrsonData.(map[string]interface{}))
 	os.WriteFile(filepath.Join(config.GetConfig().Server.AssetsPath, assetFilename) + ".brson", newBrson, 0644)
-=======
-	
-	// This logic is temporary and will be replaced by a proper library that won't unnecessarely write to disk in the future
-	dstPath := filepath.Join(config.GetConfig().Server.AssetsPath, header.Filename)
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer dst.Close()
-	
-	_, err = io.Copy(dst, file)
-	if err != nil {
-		http.Error(w, "Internal server error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	
-	// Close file before executing command that will process it
-	dst.Close()
-	
-	err = exec.Command("./ResoniteFilehost", "2", dstPath).Run()
-	if err != nil {
-		http.Error(w, "Failed to execute ResoniteFileHost: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	
-	os.Remove(dstPath)
->>>>>>> Stashed changes
 	w.Write([]byte("File uploaded successfully"))
 }
 
 func AddListeners() {
 	http.HandleFunc("/upload", HandleUpload)
 	http.HandleFunc("/addFolder", HandleAddFolder)
-<<<<<<< Updated upstream
-	http.HandleFunc("/removeItem/", HandleRemoveItem)
+	http.HandleFunc("/removeItem", HandleRemoveItem)
 }
-=======
-}
->>>>>>> Stashed changes

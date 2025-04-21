@@ -13,12 +13,12 @@ import (
 	"resonite-file-provider/upload"
 )
 
-
 func main() {
 	database.Connect()
 	defer database.Db.Close()
 
-	query.AddSearchListeners()
+	query.AddSearchListeners()    // AnimX API endpoints for VR client
+	query.AddJSONAPIListeners()   // JSON API endpoints for web interface
 	authentication.AddAuthListeners()
 	assethost.AddAssetListeners()
 	upload.AddListeners()
