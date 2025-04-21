@@ -2,7 +2,10 @@ package upload
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"resonite-file-provider/authentication"
+	"resonite-file-provider/config"
 	"resonite-file-provider/database"
 	"resonite-file-provider/query"
 	"strconv"
@@ -89,4 +92,68 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 			strconv.FormatInt(invID, 10) + "\n" + strconv.FormatInt(folderID, 10),
 		),
 	)
+}
+
+func removeItem(itemId int) error {
+	var affectedAssetIds []int
+	rows, err := database.Db.Query("SELECT asset_id FROM `hash-usage` WHERE item_id = ?", itemId)
+	if err != nil{
+		return err
+	}
+	for rows.Next() {
+		var assetId int
+		rows.Scan(&assetId)
+		affectedAssetIds = append(affectedAssetIds, assetId)
+	}
+	_, err = database.Db.Exec("DELETE FROM `hash-usage` WHERE item_id = ?", itemId)
+	_, err = database.Db.Exec("DELETE FROM Items WHERE id = ?", itemId)
+	for _, affectedId := range affectedAssetIds {
+		var assetHash string
+		err := database.Db.QueryRow("SELECT hash FROM `Assets` WHERE ID = ?", affectedId).Scan(&assetHash)
+		if err != nil {
+			return err
+		}
+		var deleteAsset bool
+		err = database.Db.QueryRow("SELECT NOT EXISTS(SELECT 1 FROM `hash-usage` WHERE `asset_id` = ?)", affectedId).Scan(&deleteAsset)
+		if deleteAsset{
+			_, err := database.Db.Exec("DELETE FROM `Assets` WHERE id = ?", affectedId)
+			if err != nil {
+				return err
+			}
+			os.Remove(filepath.Join(config.GetConfig().Server.AssetsPath, assetHash))
+			os.Remove(filepath.Join(config.GetConfig().Server.AssetsPath, assetHash) + ".brson")
+		}
+	}
+	return nil
+}
+
+//func removeFolder(folderId int) error {
+//	
+//}
+
+func HandleRemoveItem(w http.ResponseWriter, r *http.Request){
+	//if r.Method != http.MethodPost {
+	//	http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	//	return
+	//}
+	auth := r.URL.Query().Get("auth")
+	claims, err := authentication.ParseToken(auth)
+	if err != nil {
+		http.Error(w, "Auth token missing or invalid", http.StatusUnauthorized)
+	}
+	itemId, err := strconv.Atoi(r.URL.Query().Get("itemId"))
+	if err != nil {
+		http.Error(w, "itemId missing or invalid", http.StatusBadRequest)
+		return
+	}
+	var folderId int
+	database.Db.QueryRow("SELECT folder_id FROM Items WHERE id = ?", itemId).Scan(&folderId)
+	if allowed, err := query.IsFolderOwner(folderId, claims.UID); err != nil || !allowed {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	err = removeItem(itemId)
+	if err != nil {
+		http.Error(w, "Failed to remove item", http.StatusInternalServerError)
+	}
 }

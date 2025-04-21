@@ -176,16 +176,14 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			assetInsertResult, err := database.Db.Exec("INSERT INTO `Assets` (`hash`) VALUES (?)", filepath.Base(f.Name))
-			if err != nil {
-				http.Error(w, "Failed to insert asset into database", http.StatusInternalServerError)
-				return
+			if err == nil {
+				assetId, err := assetInsertResult.LastInsertId()
+				if err != nil {
+					http.Error(w, "Failed to get last insert id", http.StatusInternalServerError)
+					return
+				}
+				database.Db.Exec("INSERT INTO `hash-usage` (`asset_id`, `item_id`) VALUES (?, ?)", assetId, itemId)
 			}
-			assetId, err := assetInsertResult.LastInsertId()
-			if err != nil {
-				http.Error(w, "Failed to get last insert id", http.StatusInternalServerError)
-				return
-			}
-			database.Db.Exec("INSERT INTO `hash-usage` (`asset_id`, `item_id`) VALUES (?, ?)", assetId, itemId)
 		}
 		
 	}
@@ -214,4 +212,5 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 func AddListeners() {
 	http.HandleFunc("/upload", HandleUpload)
 	http.HandleFunc("/addFolder", HandleAddFolder)
+	http.HandleFunc("/removeItem/", HandleRemoveItem)
 }
