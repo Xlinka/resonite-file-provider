@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resonite Asset Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Auth Section -->
+        <section id="auth-section" class="active-section">
+            <div class="container">
+                <div class="auth-container">
+                    <div class="logo-container">
+                        <div class="logo">Resonite<span>Assets</span></div>
+                    </div>
+                    
+                    <div class="tabs">
+                        <div class="tab active" data-tab="login">Log In</div>
+                        <div class="tab" data-tab="register">Register</div>
+                    </div>
+                    
+                    <div class="form-container login active-form">
+                        <form id="login-form" action="/auth/login" method="POST">
+                            <div class="input-group">
+                                <label for="login-username">Username</label>
+                                <input type="text" id="login-username" name="username" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="login-password">Password</label>
+                                <input type="password" id="login-password" name="password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Log In</button>
+                            <p id="login-message" class="message"></p>
+                        </form>
+                    </div>
+                    
+                    <div class="form-container register">
+                        <form id="register-form" action="/auth/register" method="POST">
+                            <div class="input-group">
+                                <label for="register-username">Username</label>
+                                <input type="text" id="register-username" name="username" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="register-password">Password</label>
+                                <input type="password" id="register-password" name="password" required>
+                            </div>
+                            <div class="input-group">
+                                <label for="register-confirm">Confirm Password</label>
+                                <input type="password" id="register-confirm" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Register</button>
+                            <p id="register-message" class="message"></p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard-section">
+            <header class="main-header">
+                <div class="container">
+                    <div class="logo">Resonite<span>Assets</span></div>
+                    <div class="user-info">
+                        <span id="username-display"></span>
+                        <a href="/logout" class="btn btn-small">Logout</a>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="container main-content">
+                <aside class="sidebar">
+                    <div class="sidebar-header">
+                        <h3>Folders</h3>
+                        <button id="new-folder-btn" class="btn btn-small"><i class="fas fa-folder-plus"></i></button>
+                    </div>
+                    <div id="folder-tree" class="folder-tree">
+                        <!-- Folders will be dynamically loaded by the Go backend -->
+                    </div>
+                </aside>
+                
+                <main class="content">
+                    <div class="toolbar">
+                        <div class="breadcrumbs" id="breadcrumbs">
+                            <!-- Breadcrumbs will be dynamically generated -->
+                        </div>
+                        <div class="actions">
+                            <button id="upload-btn" class="btn btn-primary"><i class="fas fa-upload"></i> Upload</button>
+                        </div>
+                    </div>
+                    
+                    <div id="items-container" class="items-container">
+                        <!-- Items will be dynamically loaded by the Go backend -->
+                    </div>
+                </main>
+            </div>
+        </section>
+
+        <!-- Modals -->
+        <div id="upload-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Upload Asset</h3>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" id="current-folder-id" name="folderId" value="">
+                        <div class="input-group">
+                            <label for="file-upload">Select Resonite Package (.resonitepackage)</label>
+                            <input type="file" id="file-upload" name="file" accept=".resonitepackage" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Upload</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="new-folder-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create New Folder</h3>
+                    <span class="close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <form id="new-folder-form" action="/addFolder" method="POST">
+                        <input type="hidden" id="parent-folder-id" name="folderId" value="">
+                        <div class="input-group">
+                            <label for="folder-name">Folder Name</label>
+                            <input type="text" id="folder-name" name="folderName" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,11 +1,21 @@
 package authentication
 
 import (
+    "os"
     "time"
     "github.com/golang-jwt/jwt/v5"
 )
 
-var jwtKey = []byte("tempkey")
+// Get JWT key from environment variable or use default (for development only)
+var jwtKey = getJWTKey()
+
+func getJWTKey() []byte {
+    if key := os.Getenv("JWT_SECRET_KEY"); key != "" {
+        return []byte(key)
+    }
+    // This default key should only be used in development
+    return []byte("tempkey") 
+}
 
 type Claims struct {
     Username string `json:"username"`
@@ -17,7 +27,7 @@ type Claims struct {
 func GenerateToken(username string, uId int) (string, error) {
     claims := &Claims{
         Username: username,
-	UID: uId,
+        UID: uId,
         RegisteredClaims: jwt.RegisteredClaims{
             ExpiresAt: jwt.NewNumericDate(time.Now().Add(730 * time.Hour)),
         },
@@ -42,4 +52,3 @@ func ParseToken(tokenStr string) (*Claims, error) {
 
     return nil, jwt.ErrTokenSignatureInvalid
 }
-
