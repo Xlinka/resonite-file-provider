@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resonite Asset Manager - Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Auth Section -->
+        <section id="auth-section" class="active-section">
+            <div class="container">
+                <div class="auth-container">
+                    <div class="logo-container">
+                        <div class="logo">Resonite<span>Assets</span></div>
+                        <p class="tagline">Your VR assets, organized.</p>
+                    </div>
+                    
+                    <div class="tabs">
+                        <div class="tab active" data-tab="login">Log In</div>
+                        <div class="tab" data-tab="register">Register</div>
+                    </div>
+                    
+                    <div class="form-container login active-form">
+                        <form id="login-form" action="/auth/login" method="POST">
+                            <div class="input-group">
+                                <label for="login-username">Username</label>
+                                <div class="input-icon">
+                                    <i class="fas fa-user"></i>
+                                    <input type="text" id="login-username" name="username" required>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="login-password">Password</label>
+                                <div class="input-icon">
+                                    <i class="fas fa-lock"></i>
+                                    <input type="password" id="login-password" name="password" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Log In</button>
+                            <p id="login-message" class="message"></p>
+                        </form>
+                    </div>
+                    
+                    <div class="form-container register">
+                        <form id="register-form" action="/auth/register" method="POST">
+                            <div class="input-group">
+                                <label for="register-username">Username</label>
+                                <div class="input-icon">
+                                    <i class="fas fa-user"></i>
+                                    <input type="text" id="register-username" name="username" required>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="register-password">Password</label>
+                                <div class="input-icon">
+                                    <i class="fas fa-lock"></i>
+                                    <input type="password" id="register-password" name="password" required>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="register-confirm">Confirm Password</label>
+                                <div class="input-icon">
+                                    <i class="fas fa-lock"></i>
+                                    <input type="password" id="register-confirm" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Register</button>
+                            <p id="register-message" class="message"></p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <script src="js/auth.js"></script>
+</body>
+</html>

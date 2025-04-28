@@ -79,7 +79,7 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 	if err != nil {
 		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
 	}
-	res, err = database.Db.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, ?, ?)`, "root", -1, invID)
+	res, err = database.Db.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, NULL, ?)`, "root", invID)
 	if err != nil {
 		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
 	}

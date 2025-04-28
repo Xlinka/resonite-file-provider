@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const inventoryElement = document.createElement('div');
                 inventoryElement.className = 'inventory';
                 inventoryElement.dataset.id = inventory.id;
+                inventoryElement.dataset.rootFolderId = inventory.rootFolderId;
                 inventoryElement.innerHTML = `<i class="fas fa-box"></i> ${inventory.name}`;
                 
                 inventoryElement.addEventListener('click', () => {
@@ -335,9 +336,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load root folder of an inventory
     async function loadRootFolder(inventoryId) {
         try {
-            // In a real implementation, you would query for the root folder ID of this inventory
-            // For now, assume it's 1
-            loadFolderContents(1);
+            const token = localStorage.getItem('authToken');
+            
+            // Use the inventory data that should already include rootFolderId
+            const inventories = document.querySelectorAll('.inventory');
+            let rootFolderId = null;
+            
+            // First check if we already have the rootFolderId from the inventory list
+            inventories.forEach(inv => {
+                if (parseInt(inv.dataset.id) === inventoryId && inv.dataset.rootFolderId) {
+                    rootFolderId = parseInt(inv.dataset.rootFolderId);
+                }
+            });
+            
+            // If not found in DOM, fetch it
+            if (!rootFolderId) {
+                const response = await fetch(`/api/inventory/rootFolder?inventoryId=${inventoryId}&auth=${token}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to get root folder: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error('Failed to get root folder');
+                }
+                
+                rootFolderId = data.rootFolderId;
+            }
+            
+            // Load the folder contents with the actual root folder ID
+            loadFolderContents(rootFolderId);
         } catch (error) {
             console.error('Error loading root folder:', error);
         }

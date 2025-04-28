@@ -38,16 +38,48 @@ type Breadcrumb struct {
 	Name string
 }
 
+// Handle the login page
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, filepath.Join("upload-site", "login.html"))
+}
+
+// Handle the dashboard page
+func handleDashboard(w http.ResponseWriter, r *http.Request) {
+	// Check for auth token
+	authToken := r.URL.Query().Get("auth")
+	if authToken == "" {
+		// Try to get from cookie
+		authCookie, err := r.Cookie("auth_token")
+		if err == nil {
+			authToken = authCookie.Value
+		}
+	}
+
+	// Validate token
+	if authToken != "" {
+		_, err := authentication.ParseToken(authToken)
+		if err == nil {
+			// Token is valid, serve dashboard
+			http.ServeFile(w, r, filepath.Join("upload-site", "dashboard.html"))
+			return
+		}
+	}
+
+	// No valid token, redirect to login
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+// Handle the home page (now just redirects to login)
 func handleWebHome(w http.ResponseWriter, r *http.Request) {
-	// Serve the home page
 	http.ServeFile(w, r, filepath.Join("upload-site", "index.html"))
 }
 
+// Serve static files
 func handleStatic(w http.ResponseWriter, r *http.Request) {
-	// Serve static files
 	http.ServeFile(w, r, filepath.Join("upload-site", r.URL.Path))
 }
 
+// Handle folder view
 func handleFolder(w http.ResponseWriter, r *http.Request) {
 	// Get folder ID from query
 	folderIdStr := r.URL.Query().Get("id")
@@ -65,14 +97,20 @@ func handleFolder(w http.ResponseWriter, r *http.Request) {
 	// Get auth token
 	authToken := r.URL.Query().Get("auth")
 	if authToken == "" {
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
+		// Try to get from cookie
+		authCookie, err := r.Cookie("auth_token")
+		if err == nil {
+			authToken = authCookie.Value
+		} else {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
 	}
 
 	// Validate token
 	claims, err := authentication.ParseToken(authToken)
 	if err != nil {
-		http.Redirect(w, r, "/", http.StatusFound)
+		http.Redirect(w, r, "/login", http.StatusFound)
 		return
 	}
 
@@ -113,7 +151,7 @@ func handleFolder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse and execute template
-	tmpl, err := template.ParseFiles(filepath.Join("upload-site", "folder.html"))
+	tmpl, err := template.ParseFiles(filepath.Join("upload-site", "folder_view.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -195,8 +233,16 @@ func getBreadcrumbPath(folderId int) ([]Breadcrumb, error) {
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Client-side logout - just redirect to home
-	http.Redirect(w, r, "/", http.StatusFound)
+	// Clear auth cookie if present
+	http.SetCookie(w, &http.Cookie{
+		Name:   "auth_token",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+	
+	// Redirect to login page
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func StartWebServer() {
@@ -206,12 +252,22 @@ func StartWebServer() {
 		os.Mkdir(websitePath, 0755)
 	}
 
+	// Create the js directory if it doesn't exist
+	jsPath := filepath.Join(websitePath, "js")
+	if _, err := os.Stat(jsPath); os.IsNotExist(err) {
+		os.Mkdir(jsPath, 0755)
+	}
+
 	// Set up routes
 	http.HandleFunc("/", handleWebHome)
+	http.HandleFunc("/login", handleLogin)
+	http.HandleFunc("/dashboard", handleDashboard)
 	http.HandleFunc("/folder", handleFolder)
 	http.HandleFunc("/logout", handleLogout)
-	http.HandleFunc("/app.js", handleStatic)
+	
+	// Static files
 	http.HandleFunc("/styles.css", handleStatic)
+	http.HandleFunc("/js/", handleStatic)
 
 	// Start the web server
 	fmt.Println("Starting web server on :8080...")

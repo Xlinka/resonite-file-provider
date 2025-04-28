@@ -15,8 +15,14 @@ type InventoriesResponse struct {
 }
 
 type InventoryListItem struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	RootFolderId int    `json:"rootFolderId"`
+}
+
+type InventoryRootResponse struct {
+	Success     bool `json:"success"`
+	RootFolderId int  `json:"rootFolderId"`
 }
 
 type FoldersResponse struct {
@@ -67,7 +73,12 @@ func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
 	// Set JSON content type
 	w.Header().Set("Content-Type", "application/json")
 	
-	result, err := database.Db.Query("SELECT name, id FROM `Inventories` WHERE id in (SELECT inventory_id FROM users_inventories WHERE user_id = ?)", claims.UID)
+	result, err := database.Db.Query(`
+        SELECT i.name, i.id, 
+            (SELECT f.id FROM Folders f WHERE f.inventory_id = i.id AND (f.parent_folder_id IS NULL OR f.parent_folder_id = -1) LIMIT 1) as root_folder_id
+        FROM Inventories i 
+        WHERE i.id IN (SELECT inventory_id FROM users_inventories WHERE user_id = ?)
+    `, claims.UID)
 	if err != nil {
 		response := InventoriesResponse{
 			Success: false,
@@ -82,10 +93,12 @@ func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
 	for result.Next() {
 		var name string
 		var id int
-		result.Scan(&name, &id)
+		var rootFolderId int
+		result.Scan(&name, &id, &rootFolderId)
 		inventories = append(inventories, InventoryListItem{
-			ID:   id,
-			Name: name,
+			ID:           id,
+			Name:         name,
+			RootFolderId: rootFolderId,
 		})
 	}
 	
@@ -317,10 +330,64 @@ func listFolderContentsJSON(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// getInventoryRootFolder handles GET /api/inventory/rootFolder
+func getInventoryRootFolder(w http.ResponseWriter, r *http.Request) {
+    inventoryId, err := strconv.Atoi(r.URL.Query().Get("inventoryId"))
+    if err != nil {
+        http.Error(w, "inventoryId is either not specified or is invalid", http.StatusBadRequest)
+        return
+    }
+    
+    authKey := r.URL.Query().Get("auth")
+    claims, err := authentication.ParseToken(authKey)
+    if err != nil {
+        http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+        return
+    }
+    
+    // Check if user has access to this inventory
+    var hasAccess bool
+    err = database.Db.QueryRow(
+        "SELECT EXISTS(SELECT 1 FROM users_inventories WHERE user_id = ? AND inventory_id = ?)",
+        claims.UID, inventoryId,
+    ).Scan(&hasAccess)
+    
+    if err != nil || !hasAccess {
+        http.Error(w, "You don't have access to this inventory", http.StatusForbidden)
+        return
+    }
+    
+    // Set JSON content type
+    w.Header().Set("Content-Type", "application/json")
+    
+    // Get the root folder ID
+    var rootFolderId int
+    err = database.Db.QueryRow(
+        "SELECT id FROM Folders WHERE inventory_id = ? AND (parent_folder_id IS NULL OR parent_folder_id = -1) LIMIT 1",
+        inventoryId,
+    ).Scan(&rootFolderId)
+    
+    if err != nil {
+        response := InventoryRootResponse{
+            Success: false,
+        }
+        json.NewEncoder(w).Encode(response)
+        return
+    }
+    
+    response := InventoryRootResponse{
+        Success: true,
+        RootFolderId: rootFolderId,
+    }
+    
+    json.NewEncoder(w).Encode(response)
+}
+
 // AddJSONAPIListeners registers the JSON API endpoints
 func AddJSONAPIListeners() {
 	http.HandleFunc("/api/inventories", listInventoriesJSON)
 	http.HandleFunc("/api/folders/subfolders", listFoldersJSON)
 	http.HandleFunc("/api/folders/items", listItemsJSON)
 	http.HandleFunc("/api/folders/contents", listFolderContentsJSON)
+	http.HandleFunc("/api/inventory/rootFolder", getInventoryRootFolder)
 }
