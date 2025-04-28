@@ -26,13 +26,10 @@ RUN apk --no-cache add ca-certificates tzdata
 # Copy binary from build stage
 COPY --from=builder /app/resonite-file-provider .
 COPY --from=builder /app/config.toml .
-COPY --from=builder /app/ResoniteFilehost ./ResoniteFilehost
+# Removed ResoniteFilehost copy as it doesn't exist
 
 # Create required directories
 RUN mkdir -p ./assets
-
-# Make ResoniteFilehost executable
-RUN chmod +x ./ResoniteFilehost
 
 # Expose ports
 EXPOSE 5819

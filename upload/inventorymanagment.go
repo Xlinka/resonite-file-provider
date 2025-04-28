@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,21 +78,32 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 	}
 	_, err = database.Db.Exec(`INSERT INTO users_inventories (user_id, inventory_id) VALUES (?, ?)`, claims.UID, invID)
 	if err != nil {
-		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+		http.Error(w, "Failed to add inventory association: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+	
+	// Create root folder with NULL parent_folder_id
 	res, err = database.Db.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, NULL, ?)`, "root", invID)
 	if err != nil {
-		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+		http.Error(w, "Failed to create root folder: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+	
 	folderID, err := res.LastInsertId()
 	if err != nil {
-		http.Error(w, "Failed to add inventory", http.StatusInternalServerError)
+		http.Error(w, "Failed to get new folder ID: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	w.Write(
-		[]byte(
-			strconv.FormatInt(invID, 10) + "\n" + strconv.FormatInt(folderID, 10),
-		),
-	)
+	
+	// Return inventory and root folder IDs
+	response := map[string]interface{}{
+		"success": true,
+		"inventoryId": invID,
+		"rootFolderId": folderID,
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func removeItem(itemId int) error {

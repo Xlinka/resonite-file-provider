@@ -245,6 +245,14 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
+// Enhanced request logging middleware
+func logRequest(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("[%s] Request: %s %s\n", r.Method, r.URL.Path, r.URL.RawQuery)
+		handler(w, r)
+	}
+}
+
 func StartWebServer() {
 	// Create the upload-site directory if it doesn't exist
 	websitePath := "upload-site"
@@ -258,12 +266,12 @@ func StartWebServer() {
 		os.Mkdir(jsPath, 0755)
 	}
 
-	// Set up routes
-	http.HandleFunc("/", handleWebHome)
-	http.HandleFunc("/login", handleLogin)
-	http.HandleFunc("/dashboard", handleDashboard)
-	http.HandleFunc("/folder", handleFolder)
-	http.HandleFunc("/logout", handleLogout)
+	// Set up routes with logging
+	http.HandleFunc("/", logRequest(handleWebHome))
+	http.HandleFunc("/login", logRequest(handleLogin))
+	http.HandleFunc("/dashboard", logRequest(handleDashboard))
+	http.HandleFunc("/folder", logRequest(handleFolder))
+	http.HandleFunc("/logout", logRequest(handleLogout))
 	
 	// Static files
 	http.HandleFunc("/styles.css", handleStatic)

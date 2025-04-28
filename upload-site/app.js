@@ -105,7 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load user's inventories from server
     async function loadInventories() {
-        if (!elements.inventoryTree) return;
+        if (!elements.inventoryTree) {
+            console.log("Inventory tree element not found - probably on a different page");
+            return;
+        }
         
         try {
             elements.inventoryTree.innerHTML = '<div class="loading-spinner"></div>';
