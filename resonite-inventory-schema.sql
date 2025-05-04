@@ -2,98 +2,102 @@
 CREATE DATABASE IF NOT EXISTS `resonite-inventory`;
 USE `resonite-inventory`;
 
--- Users table for authentication and user management
-CREATE TABLE IF NOT EXISTS `Users` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `username` VARCHAR(255) NOT NULL UNIQUE,
-  `auth` VARCHAR(255) NOT NULL, -- Stores bcrypt hashed passwords
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- Users table
+CREATE TABLE `Users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` text NOT NULL,
+  `auth` varchar(256) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Inventories table to group folders and assets
-CREATE TABLE IF NOT EXISTS `Inventories` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- Inventories table
+CREATE TABLE `Inventories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Many-to-many relationship between users and inventories
-CREATE TABLE IF NOT EXISTS `users_inventories` (
-  `user_id` INT NOT NULL,
-  `inventory_id` INT NOT NULL,
-  `access_level` ENUM('owner', 'editor', 'viewer') DEFAULT 'owner',
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`user_id`, `inventory_id`),
-  FOREIGN KEY (`user_id`) REFERENCES `Users` (`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`inventory_id`) REFERENCES `Inventories` (`id`) ON DELETE CASCADE
-);
+-- Users inventories relationship table
+CREATE TABLE `users_inventories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `inventory_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `inventory_id` (`inventory_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `users_inventories_ibfk_1` FOREIGN KEY (`inventory_id`) REFERENCES `Inventories` (`id`),
+  CONSTRAINT `users_inventories_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `Users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Folders table for organizing items
-CREATE TABLE IF NOT EXISTS `Folders` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `parent_folder_id` INT NULL,
-  `inventory_id` INT NOT NULL,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`parent_folder_id`) REFERENCES `Folders` (`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`inventory_id`) REFERENCES `Inventories` (`id`) ON DELETE CASCADE
-);
+-- Folders table
+CREATE TABLE `Folders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` text NOT NULL,
+  `parent_folder_id` int(11) NOT NULL,
+  `inventory_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `inventoryId` (`inventory_id`),
+  CONSTRAINT `Folders_ibfk_1` FOREIGN KEY (`inventory_id`) REFERENCES `Inventories` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Items table for actual assets
-CREATE TABLE IF NOT EXISTS `Items` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `url` VARCHAR(512) NOT NULL,  -- Path/URL to the asset file
-  `folder_id` INT NOT NULL,
-  `type` VARCHAR(50) NOT NULL DEFAULT 'asset',  -- Type of asset (e.g., model, texture, sound)
-  `size` BIGINT UNSIGNED NULL,  -- File size in bytes
-  `hash` VARCHAR(64) NULL,      -- For deduplication purposes
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`folder_id`) REFERENCES `Folders` (`id`) ON DELETE CASCADE
-);
+-- Items table
+CREATE TABLE `Items` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` text NOT NULL,
+  `folder_id` int(11) NOT NULL,
+  `url` text NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `Items_ibfk_1` (`folder_id`),
+  CONSTRAINT `Items_ibfk_1` FOREIGN KEY (`folder_id`) REFERENCES `Folders` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Create indexes for performance
-CREATE INDEX `idx_folders_parent` ON `Folders` (`parent_folder_id`);
-CREATE INDEX `idx_folders_inventory` ON `Folders` (`inventory_id`);
-CREATE INDEX `idx_items_folder` ON `Items` (`folder_id`);
-CREATE INDEX `idx_items_url` ON `Items` (`url`);
+-- Assets table
+CREATE TABLE `Assets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `hash` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `hash` (`hash`) USING HASH
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Create a root inventory and folder for testing
-INSERT INTO `Inventories` (`id`, `name`) VALUES (1, 'Default Inventory');
+-- Hash usage table
+CREATE TABLE `hash-usage` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `asset_id` int(11) NOT NULL,
+  `item_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `asset_id` (`asset_id`),
+  KEY `item_id` (`item_id`),
+  CONSTRAINT `hash-usage_ibfk_1` FOREIGN KEY (`asset_id`) REFERENCES `Assets` (`id`),
+  CONSTRAINT `hash-usage_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `Items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Create a root folder for the default inventory
-INSERT INTO `Folders` (`id`, `name`, `parent_folder_id`, `inventory_id`) 
-VALUES (1, 'Root', NULL, 1);
+-- Tags table
+CREATE TABLE `Tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
--- Procedure to create a new user with default inventory
-DELIMITER //
-CREATE PROCEDURE create_user_with_inventory(IN username VARCHAR(255), IN auth_hash VARCHAR(255))
-BEGIN
-    DECLARE new_user_id INT;
-    DECLARE new_inventory_id INT;
-    
-    START TRANSACTION;
-    
-    -- Create user
-    INSERT INTO `Users` (`username`, `auth`) VALUES (username, auth_hash);
-    SET new_user_id = LAST_INSERT_ID();
-    
-    -- Create personal inventory
-    INSERT INTO `Inventories` (`name`) VALUES (CONCAT(username, '\'s Inventory'));
-    SET new_inventory_id = LAST_INSERT_ID();
-    
-    -- Associate user with inventory
-    INSERT INTO `users_inventories` (`user_id`, `inventory_id`, `access_level`) 
-    VALUES (new_user_id, new_inventory_id, 'owner');
-    
-    -- Create root folder
-    INSERT INTO `Folders` (`name`, `parent_folder_id`, `inventory_id`) 
-    VALUES ('Root', NULL, new_inventory_id);
-    
-    COMMIT;
-END //
-DELIMITER ;
+-- Item tags relationship table
+CREATE TABLE `item_tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tag_id` int(11) NOT NULL,
+  `item_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `item_id` (`item_id`),
+  KEY `tag_id` (`tag_id`),
+  CONSTRAINT `item_tags_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `Items` (`id`),
+  CONSTRAINT `item_tags_ibfk_2` FOREIGN KEY (`tag_id`) REFERENCES `Tags` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+-- Asset tags relationship table
+CREATE TABLE `asset_tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `asset_id` int(11) NOT NULL,
+  `tag_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `asset_id` (`asset_id`),
+  KEY `tag_id` (`tag_id`),
+  CONSTRAINT `asset_tags_ibfk_1` FOREIGN KEY (`asset_id`) REFERENCES `Assets` (`id`),
+  CONSTRAINT `asset_tags_ibfk_2` FOREIGN KEY (`tag_id`) REFERENCES `item_tags` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
