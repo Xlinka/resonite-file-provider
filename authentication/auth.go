@@ -27,6 +27,9 @@ func readBody(r *http.Request) (string, string, error) {
 	bodyString := string(body)
 	// Non standard way to read the body for ease of use in Resonite
 	creds := strings.Split(bodyString, "\n")
+	if len(creds) < 2 {
+		return "", "", fmt.Errorf("invalid credentials format")
+	}
 	username := creds[0]
 	password := creds[1]
 	return username, password, nil
@@ -58,11 +61,66 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	
 	hashedPassword := hashPassword(password)
 	
-	// Use the new CreateUserWithInventory function from database package
-	err = database.CreateUserWithInventory(username, hashedPassword)
+	// Start a transaction for creating user with inventory
+	tx, err := database.Db.Begin()
 	if err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
-		fmt.Println("Create user error:", err)
+		fmt.Println("Transaction error:", err)
+		return
+	}
+	defer tx.Rollback()
+	
+	// Create user without specifying id (let it auto-increment)
+	result, err := tx.Exec("INSERT INTO Users (username, auth) VALUES (?, ?)", username, hashedPassword)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Insert user error:", err)
+		return
+	}
+	
+	userId, err := result.LastInsertId()
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Get user ID error:", err)
+		return
+	}
+	
+	// Create inventory for the user
+	inventoryName := fmt.Sprintf("%s's Inventory", username)
+	inventoryResult, err := tx.Exec("INSERT INTO Inventories (name) VALUES (?)", inventoryName)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Insert inventory error:", err)
+		return
+	}
+	
+	inventoryId, err := inventoryResult.LastInsertId()
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Get inventory ID error:", err)
+		return
+	}
+	
+	// Associate user with inventory
+	_, err = tx.Exec("INSERT INTO users_inventories (user_id, inventory_id, access_level) VALUES (?, ?, 'owner')", userId, inventoryId)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Insert user_inventory error:", err)
+		return
+	}
+	
+	// Create root folder
+	_, err = tx.Exec("INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES ('Root', NULL, ?)", inventoryId)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Insert folder error:", err)
+		return
+	}
+	
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		fmt.Println("Commit error:", err)
 		return
 	}
 	
