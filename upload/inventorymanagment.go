@@ -86,16 +86,17 @@ func HandleAddFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Check if user has access to this folder
-	if allowed, err := query.IsFolderOwner(folderId, claims.UID); err != nil || !allowed {
+	// Check if user has editor access to this folder
+	if allowed, err := query.CheckFolderAccess(folderId, claims.UID, "editor"); err != nil || !allowed {
 		fmt.Println("[FOLDER] Access denied to folder ID:", folderId, "for user:", claims.Username)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error": "You don't have access to this folder",
+			"error": "You don't have permission to create folders here",
 		})
 		return
 	}
+	
 	// Get folder name from query parameters
 	folderName := r.URL.Query().Get("folderName")
 	if folderName == "" {
@@ -113,8 +114,9 @@ func HandleAddFolder(w http.ResponseWriter, r *http.Request) {
 	// Insert the new folder
 	result, err := database.Db.Exec(`
 		INSERT INTO Folders (name, parent_folder_id, inventory_id)
-		SELECT ?, ?, t.inventory_id
-		FROM (SELECT inventory_id FROM Folders WHERE id = ?) AS t;
+		SELECT ?, ?, inventory_id
+		FROM Folders
+		WHERE id = ?
 		`,
 		folderName, folderId, folderId,
 	)
@@ -224,10 +226,24 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 		})
 		return
 	}
+	
 	// Debug output
 	fmt.Println("[INVENTORY] Creating inventory:", inventoryName, "for user ID:", claims.UID)
 	
-	res, err := database.Db.Exec(`INSERT INTO Inventories (name) VALUES (?)`, inventoryName)
+	// Use a transaction to ensure data consistency
+	tx, err := database.Db.Begin()
+	if err != nil {
+		fmt.Println("[INVENTORY] Failed to start transaction:", err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error": "Failed to start transaction: " + err.Error(),
+		})
+		return
+	}
+	defer tx.Rollback()
+	
+	res, err := tx.Exec(`INSERT INTO Inventories (name) VALUES (?)`, inventoryName)
 	if err != nil {
 		fmt.Println("[INVENTORY] Failed to add inventory:", err.Error())
 		w.Header().Set("Content-Type", "application/json")
@@ -237,6 +253,7 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 		})
 		return
 	}
+	
 	invID, err := res.LastInsertId()
 	if err != nil {
 		fmt.Println("[INVENTORY] Failed to get inventory ID:", err.Error())
@@ -249,7 +266,9 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 	}
 	
 	fmt.Println("[INVENTORY] Created inventory with ID:", invID)
-	_, err = database.Db.Exec(`INSERT INTO users_inventories (user_id, inventory_id) VALUES (?, ?)`, claims.UID, invID)
+	
+	// Use the updated schema with access_level field
+	_, err = tx.Exec(`INSERT INTO users_inventories (user_id, inventory_id, access_level) VALUES (?, ?, 'owner')`, claims.UID, invID)
 	if err != nil {
 		fmt.Println("[INVENTORY] Failed to add inventory association:", err.Error())
 		w.Header().Set("Content-Type", "application/json")
@@ -262,7 +281,7 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 	
 	// Create root folder with NULL parent_folder_id
 	fmt.Println("[INVENTORY] Creating root folder for inventory:", invID)
-	res, err = database.Db.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, NULL, ?)`, "root", invID)
+	res, err = tx.Exec(`INSERT INTO Folders (name, parent_folder_id, inventory_id) VALUES (?, NULL, ?)`, "Root", invID)
 	if err != nil {
 		fmt.Println("[INVENTORY] Failed to create root folder:", err.Error())
 		w.Header().Set("Content-Type", "application/json")
@@ -283,10 +302,22 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 		})
 		return
 	}
+	
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		fmt.Println("[INVENTORY] Failed to commit transaction:", err.Error())
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error": "Failed to commit transaction: " + err.Error(),
+		})
+		return
+	}
+	
 	fmt.Println("[INVENTORY] Created root folder with ID:", folderID)
 	
 	// Return inventory and root folder IDs
-	// Set content type BEFORE writing any response
 	w.Header().Set("Content-Type", "application/json")
 	
 	// Create response object
@@ -311,41 +342,71 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 }
 
 func removeItem(itemId int) error {
-	var affectedAssetIds []int
-	rows, err := database.Db.Query("SELECT asset_id FROM `hash-usage` WHERE item_id = ?", itemId)
-	if err != nil{
+	// Use a transaction to ensure consistency
+	tx, err := database.Db.Begin()
+	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
+	
+	// Get affected asset IDs
+	var affectedAssetIds []int
+	rows, err := tx.Query("SELECT asset_id FROM `hash-usage` WHERE item_id = ?", itemId)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	
 	for rows.Next() {
 		var assetId int
-		rows.Scan(&assetId)
+		if err := rows.Scan(&assetId); err != nil {
+			return err
+		}
 		affectedAssetIds = append(affectedAssetIds, assetId)
 	}
-	_, err = database.Db.Exec("DELETE FROM `hash-usage` WHERE item_id = ?", itemId)
-	_, err = database.Db.Exec("DELETE FROM Items WHERE id = ?", itemId)
+	
+	// Delete hash-usage entries for this item
+	_, err = tx.Exec("DELETE FROM `hash-usage` WHERE item_id = ?", itemId)
+	if err != nil {
+		return err
+	}
+	
+	// Delete the item
+	_, err = tx.Exec("DELETE FROM Items WHERE id = ?", itemId)
+	if err != nil {
+		return err
+	}
+	
+	// Check each affected asset to see if it's still used
 	for _, affectedId := range affectedAssetIds {
 		var assetHash string
-		err := database.Db.QueryRow("SELECT hash FROM `Assets` WHERE ID = ?", affectedId).Scan(&assetHash)
+		err := tx.QueryRow("SELECT hash FROM Assets WHERE id = ?", affectedId).Scan(&assetHash)
 		if err != nil {
 			return err
 		}
-		var deleteAsset bool
-		err = database.Db.QueryRow("SELECT NOT EXISTS(SELECT 1 FROM `hash-usage` WHERE `asset_id` = ?)", affectedId).Scan(&deleteAsset)
-		if deleteAsset{
-			_, err := database.Db.Exec("DELETE FROM `Assets` WHERE id = ?", affectedId)
+		
+		var count int
+		err = tx.QueryRow("SELECT COUNT(*) FROM `hash-usage` WHERE asset_id = ?", affectedId).Scan(&count)
+		if err != nil {
+			return err
+		}
+		
+		// If asset is no longer used, delete it
+		if count == 0 {
+			_, err := tx.Exec("DELETE FROM Assets WHERE id = ?", affectedId)
 			if err != nil {
 				return err
 			}
+			
+			// Delete the physical files
 			os.Remove(filepath.Join(config.GetConfig().Server.AssetsPath, assetHash))
 			os.Remove(filepath.Join(config.GetConfig().Server.AssetsPath, assetHash) + ".brson")
 		}
 	}
-	return nil
+	
+	// Commit the transaction
+	return tx.Commit()
 }
-
-//func removeFolder(folderId int) error {
-//	
-//}
 
 func HandleRemoveItem(w http.ResponseWriter, r *http.Request){
 	fmt.Println("[ITEM] RemoveItem request received:", r.Method, r.URL.String())
@@ -433,13 +494,13 @@ func HandleRemoveItem(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	
-	// Check if user has access to the folder
-	if allowed, err := query.IsFolderOwner(folderId, claims.UID); err != nil || !allowed {
+	// Check if user has editor access to the folder
+	if allowed, err := query.CheckFolderAccess(folderId, claims.UID, "editor"); err != nil || !allowed {
 		fmt.Println("[ITEM] Access denied to folder ID:", folderId, "for user:", claims.Username)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error": "You don't have access to this item",
+			"error": "You don't have permission to delete items in this folder",
 		})
 		return
 	}

@@ -7,31 +7,27 @@ import (
 	"resonite-file-provider/database"
 	"strings"
 )
+
 func isOwnedBy(owner int, url string) bool {
 	var exists bool
 	url = strings.TrimSuffix(url, ".brson")
+	
+	// Updated query to use the new schema structure
 	database.Db.QueryRow(`
-	SELECT EXISTS (
-	  SELECT 1 
-	  FROM Users 
-	  WHERE id = ?
-	    AND id IN (
-	      SELECT user_id 
-	      FROM users_inventories 
-	      WHERE inventory_id IN (
-	        SELECT inventory_id 
-	        FROM Folders 
-	        WHERE id IN (
-	          SELECT folder_id 
-	          FROM Items 
-	          WHERE url = ?
-	        )
-	      )
-	    )
-	)
+		SELECT EXISTS (
+			SELECT 1 
+			FROM Users u
+			INNER JOIN users_inventories ui ON u.id = ui.user_id
+			INNER JOIN Inventories i ON ui.inventory_id = i.id
+			INNER JOIN Folders f ON f.inventory_id = i.id
+			INNER JOIN Items it ON it.folder_id = f.id
+			WHERE u.id = ? AND it.url = ?
+		)
 	`, owner, url).Scan(&exists)
+	
 	return exists
 }
+
 func handleRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/assets/")
@@ -54,6 +50,6 @@ func handleRequest(next http.Handler) http.Handler {
 	})
 }
 
-func AddAssetListeners(){
+func AddAssetListeners() {
 	http.Handle("/assets/", handleRequest(http.FileServer(http.Dir(config.GetConfig().Server.AssetsPath))))
 }

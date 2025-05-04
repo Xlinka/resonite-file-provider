@@ -1,6 +1,7 @@
 package query
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"resonite-file-provider/authentication"
@@ -18,6 +19,7 @@ type InventoryListItem struct {
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
 	RootFolderId int    `json:"rootFolderId"`
+	AccessLevel  string `json:"accessLevel"` // New field to show user's access level
 }
 
 type InventoryRootResponse struct {
@@ -75,19 +77,8 @@ func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
 		auth = r.URL.Query().Get("auth")
 	}
 	
-	// Debug 
 	if auth == "" {
-		// Log available cookies for debugging
-		cookies := r.Cookies()
-		cookieNames := []string{}
-		for _, cookie := range cookies {
-			cookieNames = append(cookieNames, cookie.Name)
-		}
-		if len(cookieNames) > 0 {
-			http.Error(w, "Auth token missing. Available cookies: "+strconv.Itoa(len(cookieNames)), http.StatusUnauthorized)
-		} else {
-			http.Error(w, "Auth token missing. No cookies found in request", http.StatusUnauthorized)
-		}
+		http.Error(w, "Auth token missing", http.StatusUnauthorized)
 		return
 	}
 	
@@ -100,12 +91,16 @@ func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
 	// Set JSON content type
 	w.Header().Set("Content-Type", "application/json")
 	
+	// Updated query to include access level
 	result, err := database.Db.Query(`
-        SELECT i.name, i.id, 
-            (SELECT f.id FROM Folders f WHERE f.inventory_id = i.id AND (f.parent_folder_id IS NULL OR f.parent_folder_id = -1) LIMIT 1) as root_folder_id
-        FROM Inventories i 
-        WHERE i.id IN (SELECT inventory_id FROM users_inventories WHERE user_id = ?)
-    `, claims.UID)
+		SELECT i.id, i.name, 
+			(SELECT f.id FROM Folders f WHERE f.inventory_id = i.id AND f.parent_folder_id IS NULL LIMIT 1) as root_folder_id,
+			ui.access_level
+		FROM Inventories i 
+		INNER JOIN users_inventories ui ON i.id = ui.inventory_id
+		WHERE ui.user_id = ?
+	`, claims.UID)
+	
 	if err != nil {
 		response := InventoriesResponse{
 			Success: false,
@@ -120,12 +115,27 @@ func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
 	for result.Next() {
 		var name string
 		var id int
-		var rootFolderId int
-		result.Scan(&name, &id, &rootFolderId)
+		var rootFolderId sql.NullInt64
+		var accessLevel string
+		
+		err := result.Scan(&id, &name, &rootFolderId, &accessLevel)
+		if err != nil {
+			continue
+		}
+		
+		// Handle NULL rootFolderId
+		var rootId int
+		if rootFolderId.Valid {
+			rootId = int(rootFolderId.Int64)
+		} else {
+			rootId = 0
+		}
+		
 		inventories = append(inventories, InventoryListItem{
 			ID:           id,
 			Name:         name,
-			RootFolderId: rootFolderId,
+			RootFolderId: rootId,
+			AccessLevel:  accessLevel,
 		})
 	}
 	
@@ -168,7 +178,8 @@ func listFoldersJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	if allowed, err := IsFolderOwner(folderId, claims.UID); !allowed || err != nil {
+	// Check if user has at least viewer access
+	if allowed, err := CheckFolderAccess(folderId, claims.UID, "viewer"); !allowed || err != nil {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
@@ -201,14 +212,20 @@ func listFoldersJSON(w http.ResponseWriter, r *http.Request) {
 	
 	// Get parent folder info
 	var parentInfo *ParentFolderInfo
-	var parentID *int
-	var parentName string
+	var parentID sql.NullInt64
+	var parentName sql.NullString
 	
-	err = database.Db.QueryRow("SELECT parent_folder_id, (SELECT name FROM Folders WHERE id = f.parent_folder_id) FROM Folders f WHERE id = ?", folderId).Scan(&parentID, &parentName)
-	if err == nil && parentID != nil {
+	err = database.Db.QueryRow(`
+		SELECT parent_folder_id, 
+		       (SELECT name FROM Folders WHERE id = f.parent_folder_id) as parent_name
+		FROM Folders f 
+		WHERE id = ?
+	`, folderId).Scan(&parentID, &parentName)
+	
+	if err == nil && parentID.Valid && parentName.Valid {
 		parentInfo = &ParentFolderInfo{
-			ID:   *parentID,
-			Name: parentName,
+			ID:   int(parentID.Int64),
+			Name: parentName.String,
 		}
 	}
 	
@@ -252,7 +269,8 @@ func listItemsJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	if allowed, err := IsFolderOwner(folderId, claims.UID); !allowed || err != nil {
+	// Check if user has at least viewer access
+	if allowed, err := CheckFolderAccess(folderId, claims.UID, "viewer"); !allowed || err != nil {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
@@ -324,7 +342,8 @@ func listFolderContentsJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	if allowed, err := IsFolderOwner(folderId, claims.UID); !allowed || err != nil {
+	// Check if user has at least viewer access
+	if allowed, err := CheckFolderAccess(folderId, claims.UID, "viewer"); !allowed || err != nil {
 		http.Error(w, "You don't have access to this folder", http.StatusForbidden)
 		return
 	}
@@ -384,14 +403,20 @@ func listFolderContentsJSON(w http.ResponseWriter, r *http.Request) {
 	
 	// Get parent folder info
 	var parentInfo *ParentFolderInfo
-	var parentID *int
-	var parentName string
+	var parentID sql.NullInt64
+	var parentName sql.NullString
 	
-	err = database.Db.QueryRow("SELECT parent_folder_id, (SELECT name FROM Folders WHERE id = f.parent_folder_id) FROM Folders f WHERE id = ?", folderId).Scan(&parentID, &parentName)
-	if err == nil && parentID != nil {
+	err = database.Db.QueryRow(`
+		SELECT parent_folder_id, 
+		       (SELECT name FROM Folders WHERE id = f.parent_folder_id) as parent_name
+		FROM Folders f 
+		WHERE id = ?
+	`, folderId).Scan(&parentID, &parentName)
+	
+	if err == nil && parentID.Valid && parentName.Valid {
 		parentInfo = &ParentFolderInfo{
-			ID:   *parentID,
-			Name: parentName,
+			ID:   int(parentID.Int64),
+			Name: parentName.String,
 		}
 	}
 	
@@ -436,14 +461,14 @@ func getInventoryRootFolder(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    // Check if user has access to this inventory
-    var hasAccess bool
-    err = database.Db.QueryRow(
-        "SELECT EXISTS(SELECT 1 FROM users_inventories WHERE user_id = ? AND inventory_id = ?)",
-        claims.UID, inventoryId,
-    ).Scan(&hasAccess)
+    // Check if user has at least viewer access to this inventory
+    allowed, err := database.CheckUserInventoryAccess(claims.UID, inventoryId, "viewer")
+    if err != nil {
+        http.Error(w, "Error checking access: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
     
-    if err != nil || !hasAccess {
+    if !allowed {
         http.Error(w, "You don't have access to this inventory", http.StatusForbidden)
         return
     }
@@ -454,7 +479,7 @@ func getInventoryRootFolder(w http.ResponseWriter, r *http.Request) {
     // Get the root folder ID
     var rootFolderId int
     err = database.Db.QueryRow(
-        "SELECT id FROM Folders WHERE inventory_id = ? AND (parent_folder_id IS NULL OR parent_folder_id = -1) LIMIT 1",
+        "SELECT id FROM Folders WHERE inventory_id = ? AND parent_folder_id IS NULL LIMIT 1",
         inventoryId,
     ).Scan(&rootFolderId)
     

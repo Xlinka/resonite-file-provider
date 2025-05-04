@@ -18,6 +18,7 @@ func hashPassword(password string) string {
 	}
 	return string(bytes)
 }
+
 func readBody(r *http.Request) (string, string, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -30,6 +31,7 @@ func readBody(r *http.Request) (string, string, error) {
 	password := creds[1]
 	return username, password, nil
 }
+
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	username, password, err := readBody(r)
 	if err != nil {
@@ -41,6 +43,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
+	
 	var exists bool
 	err = database.Db.QueryRow("SELECT EXISTS(SELECT 1 FROM Users WHERE username = ?)", username).Scan(&exists)
 	if err != nil && err != sql.ErrNoRows {
@@ -52,15 +55,20 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Username already exists", http.StatusConflict)
 		return
 	}
+	
 	hashedPassword := hashPassword(password)
-	_, err = database.Db.Exec("INSERT INTO `Users`(`username`, `auth`) VALUES (?, ?); ", username, hashedPassword)
+	
+	// Use the new CreateUserWithInventory function from database package
+	err = database.CreateUserWithInventory(username, hashedPassword)
 	if err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
-		fmt.Println("Insert error:", err)
+		fmt.Println("Create user error:", err)
 		return
 	}
+	
 	w.Write([]byte("User registered successfully"))
 }
+
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("[AUTH] Login request received", r.Method)
 	username, password, err := readBody(r)
@@ -125,6 +133,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	// Handle logout logic here
 	w.Write([]byte("Logout handler"))
 }
+
 // Call this before starting the server
 func AddAuthListeners() {
 	http.HandleFunc("/auth/login", loginHandler)

@@ -18,6 +18,11 @@ func main() {
 	database.Connect()
 	defer database.Db.Close()
 
+	// Verify database schema
+	if err := database.InitializeSchema(); err != nil {
+		log.Fatalf("Schema verification failed: %v", err)
+	}
+
 	query.AddSearchListeners()    // AnimX API endpoints for VR client
 	query.AddJSONAPIListeners()   // JSON API endpoints for web interface
 	authentication.AddAuthListeners()
