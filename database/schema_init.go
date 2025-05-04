@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"time"
 )
 
 // InitializeSchema verifies that the database schema is properly set up
