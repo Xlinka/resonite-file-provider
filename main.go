@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"resonite-file-provider/assethost"
 	"resonite-file-provider/authentication"
 	"resonite-file-provider/config"
@@ -33,5 +34,16 @@ func main() {
 	}
 
 	go upload.StartWebServer()
-	log.Fatal(server.ListenAndServeTLS("certs/fullchain.pem", "certs/privkey.pem"))
+	
+	// Check if TLS certificates exist
+	if _, err := os.Stat("certs/fullchain.pem"); err == nil {
+		if _, err := os.Stat("certs/privkey.pem"); err == nil {
+			log.Println("Using TLS certificates")
+			log.Fatal(server.ListenAndServeTLS("certs/fullchain.pem", "certs/privkey.pem"))
+		}
+	}
+	
+	// Fallback to HTTP if certificates don't exist
+	log.Println("TLS certificates not found, starting with HTTP")
+	log.Fatal(server.ListenAndServe())
 }

@@ -401,6 +401,40 @@ input:focus {
     border-bottom: 1px solid var(--border-color);
 }
 
+.navigation-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-icon {
+    background-color: var(--white);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+}
+
+.btn-icon:hover:not(.disabled) {
+    background-color: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+}
+
+.btn-icon.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f0f0f0;
+}
+
 .breadcrumbs {
     display: flex;
     align-items: center;
@@ -425,12 +459,53 @@ input:focus {
 }
 
 .items-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
+    padding: 20px;
 }
 
+/* Folder grid styling */
+.folder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.folder-item {
+    background-color: var(--bg-color);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    transition: var(--transition);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.folder-item:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--card-shadow);
+}
+
+.folder-icon {
+    font-size: 36px;
+    color: #ffb74d;
+    margin-bottom: 10px;
+    transition: var(--transition);
+}
+
+.folder-item:hover .folder-icon {
+    transform: scale(1.1);
+}
+
+.folder-name {
+    font-weight: 500;
+    word-break: break-word;
+    width: 100%;
+}
+
+/* Item styling */
 .item {
     background-color: var(--bg-color);
     border-radius: 10px;
@@ -768,8 +843,8 @@ input:focus {
         position: static;
     }
     
-    .items-container {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    .folder-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
     
     .auth-container {
@@ -786,11 +861,11 @@ input:focus {
 }
 
 @media (max-width: 480px) {
-    .items-container {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    .folder-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     }
     
-    .item {
+    .folder-item, .item {
         padding: 15px 10px;
     }
     

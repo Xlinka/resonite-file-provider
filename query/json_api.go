@@ -63,10 +63,37 @@ type FolderContentsResponse struct {
 
 // listInventoriesJSON handles GET /api/inventories
 func listInventoriesJSON(w http.ResponseWriter, r *http.Request) {
-	auth := r.URL.Query().Get("auth")
+	// Try to get auth token from multiple sources
+	var auth string
+	
+	// First try cookie (preferred)
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil {
+		auth = authCookie.Value
+	} else {
+		// Fallback to query parameter
+		auth = r.URL.Query().Get("auth")
+	}
+	
+	// Debug 
+	if auth == "" {
+		// Log available cookies for debugging
+		cookies := r.Cookies()
+		cookieNames := []string{}
+		for _, cookie := range cookies {
+			cookieNames = append(cookieNames, cookie.Name)
+		}
+		if len(cookieNames) > 0 {
+			http.Error(w, "Auth token missing. Available cookies: "+strconv.Itoa(len(cookieNames)), http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Auth token missing. No cookies found in request", http.StatusUnauthorized)
+		}
+		return
+	}
+	
 	claims, err := authentication.ParseToken(auth)
 	if err != nil {
-		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		http.Error(w, "Auth token invalid: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -118,10 +145,26 @@ func listFoldersJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	authKey := r.URL.Query().Get("auth")
+	// Try to get auth token from multiple sources
+	var authKey string
+	
+	// First try cookie (preferred)
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil {
+		authKey = authCookie.Value
+	} else {
+		// Fallback to query parameter
+		authKey = r.URL.Query().Get("auth")
+	}
+	
+	if authKey == "" {
+		http.Error(w, "Auth token missing", http.StatusUnauthorized)
+		return
+	}
+	
 	claims, err := authentication.ParseToken(authKey)
 	if err != nil {
-		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		http.Error(w, "Auth token invalid: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 	
@@ -186,10 +229,26 @@ func listItemsJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	authKey := r.URL.Query().Get("auth")
+	// Try to get auth token from multiple sources
+	var authKey string
+	
+	// First try cookie (preferred)
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil {
+		authKey = authCookie.Value
+	} else {
+		// Fallback to query parameter
+		authKey = r.URL.Query().Get("auth")
+	}
+	
+	if authKey == "" {
+		http.Error(w, "Auth token missing", http.StatusUnauthorized)
+		return
+	}
+	
 	claims, err := authentication.ParseToken(authKey)
 	if err != nil {
-		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		http.Error(w, "Auth token invalid: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 	
@@ -242,10 +301,26 @@ func listFolderContentsJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	authKey := r.URL.Query().Get("auth")
+	// Try to get auth token from multiple sources
+	var authKey string
+	
+	// First try cookie (preferred)
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil {
+		authKey = authCookie.Value
+	} else {
+		// Fallback to query parameter
+		authKey = r.URL.Query().Get("auth")
+	}
+	
+	if authKey == "" {
+		http.Error(w, "Auth token missing", http.StatusUnauthorized)
+		return
+	}
+	
 	claims, err := authentication.ParseToken(authKey)
 	if err != nil {
-		http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+		http.Error(w, "Auth token invalid: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 	
@@ -338,10 +413,26 @@ func getInventoryRootFolder(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    authKey := r.URL.Query().Get("auth")
+    // Try to get auth token from multiple sources
+    var authKey string
+    
+    // First try cookie (preferred)
+    authCookie, err := r.Cookie("auth_token")
+    if err == nil {
+        authKey = authCookie.Value
+    } else {
+        // Fallback to query parameter
+        authKey = r.URL.Query().Get("auth")
+    }
+    
+    if authKey == "" {
+        http.Error(w, "Auth token missing", http.StatusUnauthorized)
+        return
+    }
+    
     claims, err := authentication.ParseToken(authKey)
     if err != nil {
-        http.Error(w, "Auth token invalid or missing", http.StatusUnauthorized)
+        http.Error(w, "Auth token invalid: "+err.Error(), http.StatusUnauthorized)
         return
     }
     

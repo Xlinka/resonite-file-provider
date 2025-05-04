@@ -95,6 +95,45 @@
         </section>
     </div>
     
+    <script>
+    console.log("Login page loaded");
+    </script>
     <script src="js/auth.js"></script>
+    <script>
+    console.log("Auth.js script loaded");
+    // Add debug output to show auth cookie
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("Login page fully loaded");
+        console.log("Current cookies:", document.cookie);
+        
+        // Check for existing auth cookie and redirect if present
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+        
+        // Try to redirect to dashboard if we have a token
+        const authToken = getCookie('auth_token');
+        if (authToken) {
+            console.log("Found auth token, redirecting to dashboard...");
+            // Add a timestamp parameter to prevent caching
+            window.location.replace(`/dashboard?t=${Date.now()}`);
+            return;
+        }
+        
+        // Check for query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('debug')) {
+            console.log("Debug mode enabled");
+        }
+        
+        // If redirected from dashboard, show debug info
+        if (urlParams.has('from')) {
+            console.log("Redirected from:", urlParams.get('from'));
+        }
+    });
+    </script>
 </body>
 </html>

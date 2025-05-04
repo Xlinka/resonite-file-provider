@@ -212,7 +212,8 @@ func HandleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddListeners() {
-	http.HandleFunc("/upload", HandleUpload)
-	http.HandleFunc("/addFolder", HandleAddFolder)
-	http.HandleFunc("/removeItem", HandleRemoveItem)
+	// Use the same logRequest middleware from website.go for consistency
+	http.HandleFunc("/upload", logRequest(HandleUpload))
+	http.HandleFunc("/addFolder", logRequest(HandleAddFolder))
+	http.HandleFunc("/removeItem", logRequest(HandleRemoveItem))
 }

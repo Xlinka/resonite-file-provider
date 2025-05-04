@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o resonite-file-provider .
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o resonite-file-provider .
 
 # Final stage
 FROM alpine:latest
@@ -26,10 +26,14 @@ RUN apk --no-cache add ca-certificates tzdata
 # Copy binary from build stage
 COPY --from=builder /app/resonite-file-provider .
 COPY --from=builder /app/config.toml .
-# Removed ResoniteFilehost copy as it doesn't exist
+
+# Create ResoniteFilehost directory since it's expected by the system
+RUN mkdir -p ./ResoniteFilehost
+RUN touch ./ResoniteFilehost/placeholder.txt
 
 # Create required directories
 RUN mkdir -p ./assets
+RUN mkdir -p ./certs
 
 # Expose ports
 EXPOSE 5819

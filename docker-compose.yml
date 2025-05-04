@@ -5,7 +5,7 @@ services:
     restart: always
     ports:
       - "5819:5819"  # API port
-      - "8080:8080"  # Web interface port
+      - "7884:8080"  # Web interface port
     volumes:
       - ./assets:/app/assets
       - ./upload-site:/app/upload-site
@@ -29,7 +29,7 @@ services:
       - ./mysql-data:/var/lib/mysql
       - ./resonite-inventory-schema.sql:/docker-entrypoint-initdb.d/resonite-inventory-schema.sql
     ports:
-      - "3306:3306"
+      - "13306:3306"
     networks:
       - resonite-network
 

@@ -46,26 +46,58 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 // Handle the dashboard page
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Check for auth token
-	authToken := r.URL.Query().Get("auth")
-	if authToken == "" {
-		// Try to get from cookie
-		authCookie, err := r.Cookie("auth_token")
-		if err == nil {
-			authToken = authCookie.Value
-		}
+	var authToken string
+	
+	// First try to get from cookie (preferred method)
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil {
+		authToken = authCookie.Value
+	} else {
+		// Fallback to query parameter
+		authToken = r.URL.Query().Get("auth")
 	}
 
+	fmt.Printf("[DASHBOARD] Request from: %s, User-Agent: %s\n", r.RemoteAddr, r.UserAgent())
+	fmt.Printf("[DASHBOARD] Cookies: %v\n", r.Cookies())
+	
 	// Validate token
 	if authToken != "" {
-		_, err := authentication.ParseToken(authToken)
+		claims, err := authentication.ParseToken(authToken)
 		if err == nil {
+			// Set cookie if it came from query param to prevent future redirects
+			if authCookie == nil && authToken != "" {
+				http.SetCookie(w, &http.Cookie{
+					Name:     "auth_token",
+					Value:    authToken,
+					Path:     "/",
+					MaxAge:   86400, // 1 day
+					HttpOnly: false,  // Allow JavaScript access for debugging
+					SameSite: http.SameSiteLaxMode,
+				})
+			}
+			
+			// Debug logging
+			fmt.Printf("[DASHBOARD] Valid auth for user %s, serving dashboard\n", claims.Username)
+			
+			// Add security headers to prevent caching
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			
 			// Token is valid, serve dashboard
 			http.ServeFile(w, r, filepath.Join("upload-site", "dashboard.html"))
 			return
+		} else {
+			// Debug logging
+			fmt.Printf("[DASHBOARD] Invalid auth token: %v\n", err)
 		}
+	} else {
+		// Debug logging
+		fmt.Printf("[DASHBOARD] No auth token found in request\n")
 	}
 
 	// No valid token, redirect to login
+	fmt.Printf("[DASHBOARD] Redirecting to login page\n")
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
@@ -266,12 +298,15 @@ func StartWebServer() {
 		os.Mkdir(jsPath, 0755)
 	}
 
-	// Set up routes with logging
+// Set up routes with logging
 	http.HandleFunc("/", logRequest(handleWebHome))
 	http.HandleFunc("/login", logRequest(handleLogin))
 	http.HandleFunc("/dashboard", logRequest(handleDashboard))
 	http.HandleFunc("/folder", logRequest(handleFolder))
 	http.HandleFunc("/logout", logRequest(handleLogout))
+	
+	// Register inventory endpoint only (the others are in upload.go)
+	http.HandleFunc("/addInventory", logRequest(HandleAddInventory))
 	
 	// Static files
 	http.HandleFunc("/styles.css", handleStatic)
