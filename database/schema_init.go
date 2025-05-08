@@ -124,45 +124,4 @@ func CreateUserWithInventory(username, authHash string) error {
 	return tx.Commit()
 }
 
-// GetUserAccessLevel returns the access level for a user on an inventory
-func GetUserAccessLevel(userID, inventoryID int) (string, error) {
-	var accessLevel string
-	err := Db.QueryRow(`
-		SELECT access_level 
-		FROM users_inventories 
-		WHERE user_id = ? AND inventory_id = ?
-	`, userID, inventoryID).Scan(&accessLevel)
-	
-	if err == sql.ErrNoRows {
-		return "", nil // No access
-	}
-	if err != nil {
-		return "", err
-	}
-	
-	return accessLevel, nil
-}
 
-// CheckUserInventoryAccess checks if a user has sufficient access to an inventory
-func CheckUserInventoryAccess(userID, inventoryID int, requiredLevel string) (bool, error) {
-	accessLevel, err := GetUserAccessLevel(userID, inventoryID)
-	if err != nil {
-		return false, err
-	}
-	
-	if accessLevel == "" {
-		return false, nil
-	}
-	
-	// Access level hierarchy: owner > editor > viewer
-	switch requiredLevel {
-	case "viewer":
-		return true, nil // Any access is sufficient
-	case "editor":
-		return accessLevel == "owner" || accessLevel == "editor", nil
-	case "owner":
-		return accessLevel == "owner", nil
-	default:
-		return false, fmt.Errorf("invalid access level: %s", requiredLevel)
-	}
-}
