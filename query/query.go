@@ -76,22 +76,22 @@ func getChildItemsTracks(folderId int, nodeName string) (animxmaker.AnimationTra
 	return &idsTrack, &namesTrack, &urlsTrack, nil
 }
 
-// CheckFolderAccess verifies if a user has access to a folder
-func CheckFolderAccess(folderId int, userId int, requiredLevel string) (bool, error) {
-	// Get the inventory ID for this folder
-	var inventoryId int
-	err := database.Db.QueryRow("SELECT inventory_id FROM Folders WHERE id = ?", folderId).Scan(&inventoryId)
+
+func IsFolderOwner(folderId int, userId int) (bool, error) {
+	rows, err := database.Db.Query("SELECT id from Users WHERE id = (SELECT user_id from users_inventories where inventory_id = (SELECT inventory_id FROM Folders WHERE id = ?))", folderId)
 	if err != nil {
 		return false, err
 	}
-	
-	// Check user's access level for this inventory
-	return database.CheckUserInventoryAccess(userId, inventoryId, requiredLevel)
-}
-
-// Updated function to use the new access control
-func IsFolderOwner(folderId int, userId int) (bool, error) {
-	return CheckFolderAccess(folderId, userId, "owner")
+	for rows.Next(){
+		var currectUserId int
+		if err := rows.Scan(&currectUserId); err != nil{
+			return false, err
+		}
+		if currectUserId == userId {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func listFolders(w http.ResponseWriter, r *http.Request) {
