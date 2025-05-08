@@ -102,7 +102,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// Associate user with inventory
-	_, err = tx.Exec("INSERT INTO users_inventories (user_id, inventory_id, access_level) VALUES (?, ?, 'owner')", userId, inventoryId)
+	_, err = tx.Exec("INSERT INTO users_inventories (user_id, inventory_id) VALUES (?, ?)", userId, inventoryId)
 	if err != nil {
 		http.Error(w, "Server error", http.StatusInternalServerError)
 		fmt.Println("Insert user_inventory error:", err)
