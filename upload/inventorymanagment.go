@@ -268,7 +268,7 @@ func HandleAddInventory(w http.ResponseWriter, r* http.Request){
 	fmt.Println("[INVENTORY] Created inventory with ID:", invID)
 	
 	// Use the updated schema with access_level field
-	_, err = tx.Exec(`INSERT INTO users_inventories (user_id, inventory_id, access_level) VALUES (?, ?, 'owner')`, claims.UID, invID)
+	_, err = tx.Exec(`INSERT INTO users_inventories (user_id, inventory_id) VALUES (?, ?)`, claims.UID, invID)
 	if err != nil {
 		fmt.Println("[INVENTORY] Failed to add inventory association:", err.Error())
 		w.Header().Set("Content-Type", "application/json")
